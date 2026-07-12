@@ -8,7 +8,9 @@ Standing constraints:
 
 - Built on the official NV Access add-on template; distributed through the NVDA add-on store.
 - UX must be NVDA-idiomatic — the NVDA source at `../nvda` is the pattern reference.
-- Every user-visible string uses NVDA's gettext pattern (this add-on will be translated).
+- Every user-visible string is marked translatable NVDA-style: `addonHandler.initTranslation()`
+  per module, strings wrapped in `_("...")` (or `ngettext`/`pgettext`), each preceded by a
+  `# Translators:` comment for the .pot extraction. This add-on will be translated.
 
 ## Agent skills
 
