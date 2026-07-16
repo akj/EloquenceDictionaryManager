@@ -6,6 +6,11 @@
 > prototype branch, out of `main`; validated decisions get folded into
 > `docs/specs/dictionaries-addon.md` when the ticket resolves.
 
+> A runnable wx mock accompanies this doc: [`entry_editor_prototype.py`](entry_editor_prototype.py)
+> (`python docs/prototypes/entry_editor_prototype.py`, on this branch). In the real
+> add-on the Play buttons speak directly via `getSynth().speak()` — no dialog; the mock
+> stands that in with Windows SAPI so it genuinely talks.
+
 Medium call: **textual walkthrough**, not a runnable wx dialog. The product is a
 speech-first, keyboard-first NVDA dialog; what needs judging is focus order, spoken
 feedback, and flow — none of which a wx dialog running outside NVDA can demonstrate.

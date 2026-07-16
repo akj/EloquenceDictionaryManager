@@ -7,10 +7,12 @@
 # What is real here: dialog layout, tab order, labels/accelerators, list columns,
 # provenance display, add/edit/customize/remove flows, focus handling, the full
 # validation catalog, and the per-type Rules guidance text.
-# What is simulated: speech preview (message box instead of getSynth().speak()),
-# and the "[Prototype harness]" checkbox standing in for which synth is active.
+# What is simulated: speech preview speaks through Windows SAPI (a stand-in for the
+# real getSynth().speak(), since there is no Eloquence engine outside NVDA); the
+# "[Prototype harness]" checkbox stands in for which synth is active.
 
 import string
+import subprocess
 import wx
 
 # ---------------------------------------------------------------- sample data
@@ -207,6 +209,7 @@ class EntryDialog(wx.Dialog):
         super().__init__(parent, title=title)
         self.lang = lang
         self.result = None
+        self._speechProc = None
 
         outer = wx.BoxSizer(wx.VERTICAL)
         body = wx.BoxSizer(wx.VERTICAL)
@@ -271,18 +274,35 @@ class EntryDialog(wx.Dialog):
     def onTypeChanged(self, evt):
         self.rulesCtrl.SetValue(RULES[self.slot()])
 
-    def _speak(self, what, text):
-        # PROTOTYPE: stands in for speech.cancelSpeech(); getSynth().speak([text])
-        wx.MessageBox(
-            'Would speak through Eloquence (bypassing NVDA dictionaries):\n\n'
-            "%s" % (text or "(nothing)"),
-            "Preview — %s (simulated)" % what, wx.OK, self)
+    def _speak(self, text):
+        # Real add-on: speech.cancelSpeech(); getSynth().speak([text]) — speaks
+        # directly, no dialog. PROTOTYPE stands that in with Windows SAPI, launched
+        # detached so speech is async and successive previews interrupt (SAPIF_PURGE).
+        text = (text or "").strip()
+        if not text:
+            return
+        if self._speechProc and self._speechProc.poll() is None:
+            self._speechProc.terminate()  # stands in for cancelSpeech()
+        ps = (
+            "Add-Type -AssemblyName System.Speech;"
+            "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+            "$s.Speak([Console]::In.ReadToEnd())"
+        )
+        try:
+            self._speechProc = subprocess.Popen(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, text=True)
+            self._speechProc.stdin.write(text)
+            self._speechProc.stdin.close()
+        except OSError:
+            pass  # prototype: no voice available, just stay silent
 
     def onPlayCurrent(self, evt):
-        self._speak("current", self.wordCtrl.GetValue())
+        self._speak(self.wordCtrl.GetValue())
 
     def onPlayNew(self, evt):
-        self._speak("new", self.pronCtrl.GetValue())
+        self._speak(self.pronCtrl.GetValue())
 
     def onOk(self, evt):
         word = self.wordCtrl.GetValue().strip()
