@@ -238,7 +238,7 @@ offending text — the engine would otherwise drop the entry *silently*.
 | Word root: multi-word / annotated value | "A word root pronunciation must be a single word or one phonetic string (\`[...]) — no spaces, digits, or emphasis codes." |
 | Abbreviation: illegal key chars | "An abbreviation can contain only letters and periods, with apostrophes inside the word — for example \"Dr.\" or \"e.g.\"." |
 | Abbreviation: illegal value | "An abbreviation expansion must be plain words separated by spaces or hyphens — no digits, punctuation, or phonetic symbols." |
-| Any: character outside CP1252 | "The character \"š\" cannot be saved in an Eloquence dictionary (Western encoding only)." — never silently stripped; that's the corruption this editor exists to stop. |
+| Any: character outside CP1252 | "The character \"ē\" cannot be saved in an Eloquence dictionary (Western encoding only)." — never silently stripped; that's the corruption this editor exists to stop. |
 | SPR: unbalanced | "The phonetic string is not closed — expected \"]\" after \"\`[\"." |
 | SPR: no primary stress | "A phonetic string with more than one syllable needs a primary stress marker \"1\", for example \`[.1kwi.0nwa]." |
 | Duplicate personal key (same type; case-insensitive for roots) | Yes/No: "You already have a personal entry for \"no\" (Exact word). Replace it?" |
