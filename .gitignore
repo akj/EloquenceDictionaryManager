@@ -230,3 +230,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# NVDA add-on build outputs
+addon/doc/*.css
+addon/doc/en/
+*_docHandler.py
+*.html
+manifest.ini
+*.nvda-addon
+.sconsign.dblite
+/[0-9]*.[0-9]*.[0-9]*.json
