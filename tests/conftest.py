@@ -6,5 +6,7 @@ import sys
 from pathlib import Path
 
 
-PACKAGE_PARENT = Path(__file__).resolve().parents[1] / "addon" / "globalPlugins" / "eloquenceDictionaryManager"
+PACKAGE_PARENT = (
+	Path(__file__).resolve().parents[1] / "addon" / "globalPlugins" / "eloquenceDictionaryManager"
+)
 sys.path.insert(0, str(PACKAGE_PARENT))

@@ -9,7 +9,9 @@ try:
 
 	addonHandler.initTranslation()
 except (ImportError, ModuleNotFoundError):
-	_ = lambda s: s
+
+	def _(text: str) -> str:
+		return text
 
 
 @dataclass(frozen=True, slots=True)

@@ -15,7 +15,9 @@ try:
 
 	addonHandler.initTranslation()
 except (ImportError, ModuleNotFoundError):
-	_ = lambda s: s
+
+	def _(text: str) -> str:
+		return text
 
 
 class Field(str, Enum):
@@ -256,8 +258,7 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 		):
 			# Translators: SPR validation error for malformed quoting around a two-character phoneme symbol.
 			message = _(
-				"A quoted phonetic symbol must contain exactly two characters between "
-				"matching apostrophes.",
+				"A quoted phonetic symbol must contain exactly two characters between matching apostrophes.",
 			)
 			issues.append(_issue(ValidationCode.SPR_QUOTE_INVALID, Field.VALUE, message))
 		if body.count(".") + 1 > 1 and "1" not in body:
