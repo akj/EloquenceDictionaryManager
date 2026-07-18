@@ -16,7 +16,9 @@ try:
 
 	addonHandler.initTranslation()
 except (ImportError, ModuleNotFoundError):
-	_ = lambda s: s
+
+	def _(text: str) -> str:
+		return text
 
 
 CANONICAL_LINE_ENDING = b"\r\n"
@@ -86,7 +88,9 @@ def find_dictionary_file(
 
 	directory_path = Path(directory)
 	expected = canonical_filename(language, slot).casefold()
-	matches = [path for path in directory_path.iterdir() if path.is_file() and path.name.casefold() == expected]
+	matches = [
+		path for path in directory_path.iterdir() if path.is_file() and path.name.casefold() == expected
+	]
 	if len(matches) > 1:
 		# Translators: Import error when differently-cased copies of the same dictionary filename coexist. {name} is the canonical filename.
 		message = _(
@@ -202,8 +206,7 @@ def serialize_dictionary_bytes(
 		character = text[error.start : error.start + 1]
 		# Translators: Save error for a character not supported by a Western ECI language code page. {character} is the character.
 		message = _(
-			'The character "{character}" cannot be saved in an Eloquence dictionary '
-			"(Western encoding only).",
+			'The character "{character}" cannot be saved in an Eloquence dictionary (Western encoding only).',
 		).format(character=character)
 		raise DictionaryEncodingError(message) from error
 
