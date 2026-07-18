@@ -1,8 +1,8 @@
-# Eloquence Dictionaries add-on
+# Eloquence Dictionary Manager add-on
 
-NVDA add-on (working name **Eloquence Dictionaries**) that owns distribution of community
+NVDA add-on **Eloquence Dictionary Manager** that owns distribution of community
 Eloquence pronunciation dictionary sets and an editor for personal entries. Split out of the
-Eloquence synth-driver add-on; see `docs/specs/dictionaries-addon.md` for the origin design.
+Eloquence synth-driver add-on; see `docs/specs/dictionaries-addon.md` for the v1 spec.
 
 Standing constraints:
 
