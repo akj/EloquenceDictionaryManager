@@ -19,7 +19,7 @@ classifiers = [
 	"Topic :: Accessibility",
 ]
 readme = "readme.md"
-license = {file = "COPYING.TXT"}
+license = {file = "COPYING.txt"}
 # This package is not installed as a library; every dependency is tooling used to
 # build, translate, or lint the add-on. They are declared as PEP 735 dependency groups.
 dependencies = []
@@ -58,7 +58,7 @@ lint = [
 	"pyright[nodejs]==1.1.407",
 	# Only for pyright's wx type resolution; NVDA add-on dev is Windows-only and
 	# Linux CI (which skips the pyright hook) has no wxPython wheel to install.
-	"wxPython==4.2.5; sys_platform == 'win32'",
+	"wxPython==4.2.4; sys_platform == 'win32'",
 ]
 # Tests
 test = [
