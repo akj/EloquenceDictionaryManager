@@ -67,8 +67,8 @@ def parse_dictionary_filename(path: str | Path) -> DictionaryFilename:
 	name = Path(path).name
 	match = _FILENAME_PATTERN.fullmatch(name)
 	if match is None:
-		# Translators: Import error when a filename does not follow the ECI dictionary naming convention. {name} is the filename.
 		message = _(
+			# Translators: Import error when a filename does not follow the ECI dictionary naming convention. {name} is the filename.
 			'The file "{name}" is not named like an ECI dictionary file.',
 		).format(name=name)
 		raise DictionaryFilenameError(message)
@@ -92,8 +92,8 @@ def find_dictionary_file(
 		path for path in directory_path.iterdir() if path.is_file() and path.name.casefold() == expected
 	]
 	if len(matches) > 1:
-		# Translators: Import error when differently-cased copies of the same dictionary filename coexist. {name} is the canonical filename.
 		message = _(
+			# Translators: Import error when differently-cased copies of the same dictionary filename coexist. {name} is the canonical filename.
 			'More than one file matches the dictionary filename "{name}".',
 		).format(name=canonical_filename(language, slot))
 		raise DictionaryFilenameError(message)
@@ -120,8 +120,8 @@ def parse_dictionary_bytes(
 	try:
 		text = data.decode(language_record.encoding, errors="strict")
 	except UnicodeDecodeError as error:
-		# Translators: Import error for bytes invalid in a language's code page. {code} is the ECI voice code and {offset} is the byte position.
 		message = _(
+			# Translators: Import error for bytes invalid in a language's code page. {code} is the ECI voice code and {offset} is the byte position.
 			'The dictionary contains bytes that are invalid for the "{code}" voice at byte {offset}.',
 		).format(code=language_record.code, offset=error.start)
 		raise DictionaryEncodingError(message) from error
@@ -143,8 +143,8 @@ def parse_dictionary_bytes(
 			raise DictionaryFormatError(message)
 		tab_count = line.count("\t")
 		if tab_count != 1 and not (allow_invalid_entries and tab_count > 1):
-			# Translators: Import error when a line does not contain exactly one tab separator. {line} is the one-based line number.
 			message = _(
+				# Translators: Import error when a line does not contain exactly one tab separator. {line} is the one-based line number.
 				"Dictionary line {line} must contain exactly one tab between the word and pronunciation.",
 			).format(line=line_number)
 			raise DictionaryFormatError(message)
@@ -213,8 +213,8 @@ def serialize_dictionary_bytes(
 		return text.encode(language_record.encoding, errors="strict")
 	except UnicodeEncodeError as error:
 		character = text[error.start : error.start + 1]
-		# Translators: Save error for a character not supported by a Western ECI language code page. {character} is the character.
 		message = _(
+			# Translators: Save error for a character not supported by a Western ECI language code page. {character} is the character.
 			'The character "{character}" cannot be saved in an Eloquence dictionary (Western encoding only).',
 		).format(character=character)
 		raise DictionaryEncodingError(message) from error
