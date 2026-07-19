@@ -254,7 +254,7 @@ class SetDetailsDialog(wx.Dialog):
 		)
 		sizer_helper.addLabeledControl(
 			# Translators: Label for the Managed Dictionary Set license URL.
-			_("License U&RL:"),
+			_("L&icense URL:"),
 			wx.TextCtrl,
 			value=managed_set.license_url,
 			size=cast("wx.Size", (440, -1)),
