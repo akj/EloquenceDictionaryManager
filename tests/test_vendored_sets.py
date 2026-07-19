@@ -9,20 +9,29 @@ from vendored_sets import VendoringError, load_lock, process_upstream_tree, veri
 
 
 SET_ID = "github.example.test-dictionaries"
+LICENSE_TEXT = "CC0 1.0 Universal\n"
+LICENSE_SHA256 = hashlib.sha256(LICENSE_TEXT.encode("utf-8")).hexdigest()
 
 
-def _write_lock(path: Path, *, license_value: str = "CC0-1.0") -> None:
+def _write_lock(
+	path: Path,
+	*,
+	license_value: str = "CC0-1.0",
+	revision: str = "0123456789abcdef0123456789abcdef01234567",
+	license_sha256: str | None = None,
+) -> None:
 	_ = path.write_text(
 		f"""[set {SET_ID}]
 github_repository = example/test-dictionaries
 name = TestDictionaries
 source_url = https://example.com/test-dictionaries
 source_version = v1.0
-source_revision = 0123456789abcdef0123456789abcdef01234567
+source_revision = {revision}
 attribution = Maintained by Test Contributors.
 license = {license_value}
 license_url = https://example.com/test-dictionaries/LICENSE.md
 license_file = LICENSE.md
+license_sha256 = {license_sha256 if license_sha256 is not None else LICENSE_SHA256}
 
 [files {SET_ID}]
 """,
@@ -41,7 +50,7 @@ def _write_upstream_tree(path: Path) -> dict[str, bytes]:
 	for name, data in contents.items():
 		_ = (path / name).write_bytes(data)
 	_ = (path / "README.md").write_text("Not vendored.\n", encoding="utf-8")
-	_ = (path / "LICENSE.md").write_text("CC0 1.0 Universal\n", encoding="utf-8")
+	_ = (path / "LICENSE.md").write_text(LICENSE_TEXT, encoding="utf-8", newline="\n")
 	return contents
 
 
@@ -119,15 +128,35 @@ def test_refresh_rejects_a_missing_license_file(tmp_path: Path) -> None:
 		_ = process_upstream_tree(upstream_root, load_lock(lock_path).sets[SET_ID])
 
 
-def test_refresh_rejects_a_license_without_the_cc0_marker(tmp_path: Path) -> None:
+def test_refresh_rejects_a_license_file_that_does_not_match_the_pinned_hash(tmp_path: Path) -> None:
 	lock_path = tmp_path / "dictionarySources.lock.ini"
 	_write_lock(lock_path)
 	upstream_root = tmp_path / "upstream"
 	_ = _write_upstream_tree(upstream_root)
-	_ = (upstream_root / "LICENSE.md").write_text("A different license.\n", encoding="utf-8")
+	_ = (upstream_root / "LICENSE.md").write_text(
+		"This work is NOT licensed under CC0 1.0 Universal.\n",
+		encoding="utf-8",
+		newline="\n",
+	)
 
-	with pytest.raises(VendoringError, match="required CC0 marker"):
+	with pytest.raises(VendoringError, match="not the pinned\\s+license_sha256"):
 		_ = process_upstream_tree(upstream_root, load_lock(lock_path).sets[SET_ID])
+
+
+def test_load_lock_rejects_a_short_source_revision(tmp_path: Path) -> None:
+	lock_path = tmp_path / "dictionarySources.lock.ini"
+	_write_lock(lock_path, revision="banana")
+
+	with pytest.raises(VendoringError, match="full lowercase 40-hex commit SHA"):
+		_ = load_lock(lock_path)
+
+
+def test_load_lock_rejects_a_malformed_license_hash(tmp_path: Path) -> None:
+	lock_path = tmp_path / "dictionarySources.lock.ini"
+	_write_lock(lock_path, license_sha256="not-a-hash")
+
+	with pytest.raises(VendoringError, match="64-hex SHA-256 digest"):
+		_ = load_lock(lock_path)
 
 
 def test_refresh_rejects_an_unsupported_license_value(tmp_path: Path) -> None:

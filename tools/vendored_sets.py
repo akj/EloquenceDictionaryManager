@@ -29,6 +29,8 @@ from ecidic import DictionaryFilename, Entry, parse_dictionary_filename, validat
 
 
 SET_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
+REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 SET_SECTION_PREFIX = "set "
 FILES_SECTION_PREFIX = "files "
 SET_LOCK_FIELDS = (
@@ -41,6 +43,7 @@ SET_LOCK_FIELDS = (
 	"license",
 	"license_url",
 	"license_file",
+	"license_sha256",
 )
 SET_INI_FIELDS = (
 	"id",
@@ -54,7 +57,6 @@ SET_INI_FIELDS = (
 )
 CONTRACT_TEXT = "[contract]\nformat = eci-dictionary-sets\nversion = 1\n"
 CC0_LICENSE = "CC0-1.0"
-CC0_MARKER = b"CC0 1.0 Universal"
 USER_AGENT = "EloquenceDictionaryManager vendored_sets.py"
 
 
@@ -92,6 +94,7 @@ class SetConfig:
 	license: str
 	license_url: str
 	license_file: str
+	license_sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,24 +179,29 @@ def load_lock(path: Path) -> SourceLock:
 	files: dict[str, dict[str, str]] = {}
 	for set_id in set_ids:
 		values = _section_values(parser, f"{SET_SECTION_PREFIX}{set_id}", SET_LOCK_FIELDS)
+		if REVISION_PATTERN.fullmatch(values["source_revision"]) is None:
+			raise VendoringError(
+				f"[set {set_id}] source_revision must be a full lowercase 40-hex commit SHA.",
+			)
+		if SHA256_PATTERN.fullmatch(values["license_sha256"]) is None:
+			raise VendoringError(
+				f"[set {set_id}] license_sha256 must be a lowercase 64-hex SHA-256 digest.",
+			)
 		sets[set_id] = SetConfig(id=set_id, **values)
 		files[set_id] = dict(parser.items(f"{FILES_SECTION_PREFIX}{set_id}"))
 	return SourceLock(sets=sets, files=files)
 
 
+def _set_ini_values(set_config: SetConfig) -> dict[str, str]:
+	"""Map the lock metadata onto the eight required ``set.ini`` fields."""
+
+	return {field: getattr(set_config, field) for field in SET_INI_FIELDS}
+
+
 def generate_set_ini_text(set_config: SetConfig) -> str:
 	"""Generate canonical installed metadata for one managed set."""
 
-	values = {
-		"id": set_config.id,
-		"name": set_config.name,
-		"source_url": set_config.source_url,
-		"source_version": set_config.source_version,
-		"source_revision": set_config.source_revision,
-		"attribution": set_config.attribution,
-		"license": set_config.license,
-		"license_url": set_config.license_url,
-	}
+	values = _set_ini_values(set_config)
 	return "[set]\n" + "".join(f"{field} = {values[field]}\n" for field in SET_INI_FIELDS)
 
 
@@ -275,9 +283,11 @@ def process_upstream_tree(
 		license_bytes = license_path.read_bytes()
 	except OSError as error:
 		raise VendoringError(f"Could not read license file {license_path}: {error}") from error
-	if CC0_MARKER not in license_bytes:
+	license_hash = hashlib.sha256(license_bytes).hexdigest()
+	if license_hash != set_config.license_sha256:
 		raise VendoringError(
-			f"Set {set_config.id!r} license file does not contain the required CC0 marker.",
+			f"Set {set_config.id!r} license file hashes to {license_hash}, not the pinned "
+			+ "license_sha256. Review the upstream license change and update the lock deliberately.",
 		)
 
 	result: dict[str, bytes] = {}
@@ -414,16 +424,7 @@ def _verify_set_ini(path: Path, set_config: SetConfig) -> list[str]:
 	actual_fields = set(parser.options("set"))
 	if actual_fields != set(SET_INI_FIELDS):
 		problems.append(f"{set_config.id}/set.ini must contain exactly the eight required fields")
-	values = {
-		"id": set_config.id,
-		"name": set_config.name,
-		"source_url": set_config.source_url,
-		"source_version": set_config.source_version,
-		"source_revision": set_config.source_revision,
-		"attribution": set_config.attribution,
-		"license": set_config.license,
-		"license_url": set_config.license_url,
-	}
+	values = _set_ini_values(set_config)
 	for field in SET_INI_FIELDS:
 		if field in actual_fields and parser.get("set", field) != values[field]:
 			problems.append(f"{set_config.id}/set.ini field {field!r} does not match the source lock")
