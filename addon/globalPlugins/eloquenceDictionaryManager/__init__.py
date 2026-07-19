@@ -3,6 +3,7 @@
 from typing import cast, override
 
 import addonHandler
+import config
 import globalPluginHandler
 import globalVars
 import gui
@@ -17,6 +18,14 @@ _nvdaGettext = _
 addonHandler.initTranslation()
 
 _SPEECH_DICTIONARIES_MENU_LABEL = _nvdaGettext("Speech &dictionaries")
+CONFIG_SECTION = "eloquenceDictionaryManager"
+
+# Register the add-on-owned NVDA configuration section once when the global
+# plugin module is loaded. ConfigObj applies the default on first access.
+if CONFIG_SECTION not in config.conf.spec:
+	config.conf.spec[CONFIG_SECTION] = {
+		"migrationDismissed": "boolean(default=False)",
+	}
 
 
 def _normalizeMenuLabel(label: str) -> str:

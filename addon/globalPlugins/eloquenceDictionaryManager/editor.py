@@ -11,8 +11,12 @@ from pathlib import Path
 from typing import cast, override
 
 import addonHandler
+import config
 from gui import guiHelper
-from gui.nvdaControls import AutoWidthColumnListCtrl
+from gui.nvdaControls import (  # pyright: ignore[reportPrivateUsage]
+	_CheckListCtrl,
+	AutoWidthColumnListCtrl,
+)
 from gui.settingsDialogs import SettingsDialog
 from logHandler import log
 import NVDAState
@@ -32,12 +36,23 @@ from .ecidic.artifact import (
 )
 from .ecidic.effective import EffectiveRow, EffectiveView, RowKind, ShowFilter
 from .ecidic.languages import LANGUAGES
+from .ecidic.historicalunion import HistoricalUnion, HistoricalUnionFormatError
+from .ecidic.migration import (
+	MigrationCandidate,
+	MigrationCandidateRow,
+	MigrationDiagnostic,
+	apply_migration_candidates,
+	classify_migration_candidates,
+	discover_migration_candidates,
+	scan_migration_directory,
+)
 from .ecidic.model import Entry, Slot
 from .ecidic.overlay import load_personal_overlay, save_personal_overlay
 from .ecidic.parsing import DictionaryEncodingError, key_identity
 from .ecidic.preview import is_eloquence_active
 from .ecidic.sets import ManagedSet, discover_managed_sets
 from .ecidic.validation import EntryValidationError, Field, normalize_entry, validate_entry
+from . import CONFIG_SECTION
 
 
 addonHandler.initTranslation()
@@ -459,6 +474,162 @@ class ImportModeDialog(wx.Dialog):
 		return ImportMode.REPLACE if self._mode_control.GetSelection() == 1 else ImportMode.MERGE
 
 
+class MigrationReviewDialog(wx.Dialog):
+	"""Modal checkable review of classified legacy dictionary entries."""
+
+	def __init__(self, parent: wx.Window, rows: tuple[MigrationCandidateRow, ...]):
+		super().__init__(
+			parent,
+			# Translators: Title of the dialog for reviewing entries found in old Eloquence dictionaries.
+			title=_("Import from Old Eloquence Dictionary Files"),
+		)
+		self._rows = rows
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer_helper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		sizer_helper.addItem(
+			wx.StaticText(
+				self,
+				# Translators: Label for the checkable list of entries found in old Eloquence dictionaries.
+				label=_("Dictionary &entries to import"),
+			),
+		)
+		self._entry_list = _CheckListCtrl(
+			self,
+			autoSizeColumn="LAST",
+			size=cast("wx.Size", (720, 360)),
+			style=wx.LC_REPORT | wx.LC_SINGLE_SEL,
+		)
+		# Translators: Column header for a word found in an old Eloquence dictionary.
+		self._entry_list.AppendColumn(_("Word"), width=135)
+		# Translators: Column header for a pronunciation found in an old Eloquence dictionary.
+		self._entry_list.AppendColumn(_("Pronunciation"), width=165)
+		# Translators: Column header for the type of an old Eloquence dictionary entry.
+		self._entry_list.AppendColumn(_("Type"), width=100)
+		# Translators: Column header for the language of an old Eloquence dictionary entry.
+		self._entry_list.AppendColumn(_("Language"), width=140)
+		# Translators: Column header describing an old Eloquence dictionary entry's migration status.
+		self._entry_list.AppendColumn(_("Status"), width=230)
+		language_names = _language_display_names()
+		slot_labels = _slot_labels()
+		for row in rows:
+			index = cast(
+				int,
+				self._entry_list.Append(
+					(
+						row.word,
+						row.pronunciation,
+						slot_labels[row.slot],
+						language_names[row.language],
+						row.status_text,
+					),
+				),
+			)
+			if not row.checkable:
+				_removedCheckbox = self._entry_list.removeCheckbox(index)
+			elif row.checked_by_default:
+				self._entry_list.CheckItem(index)
+		sizer_helper.addItem(self._entry_list, proportion=1, flag=wx.EXPAND)
+
+		button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
+		import_button = button_helper.addButton(
+			self,
+			id=wx.ID_OK,
+			# Translators: Button that imports the checked entries from old Eloquence dictionaries.
+			label=_("&Import checked entries"),
+		)
+		import_button.SetDefault()
+		import_button.Bind(wx.EVT_BUTTON, lambda _event: self.EndModal(wx.ID_OK))
+		cancel_button = button_helper.addButton(
+			self,
+			id=wx.ID_CANCEL,
+			# Translators: Button that closes the old-dictionary review without importing entries.
+			label=_("Cancel"),
+		)
+		cancel_button.Bind(wx.EVT_BUTTON, lambda _event: self.EndModal(wx.ID_CANCEL))
+		outer_sizer.Add(
+			sizer_helper.sizer,
+			proportion=1,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			button_helper.sizer,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+		if rows:
+			self._entry_list.Select(0)
+			self._entry_list.Focus(0)
+		self._entry_list.SetFocus()
+
+	@property
+	def checked_rows(self) -> tuple[MigrationCandidateRow, ...]:
+		"""Return the rows whose accessible checkboxes are selected."""
+
+		return tuple(row for index, row in enumerate(self._rows) if self._entry_list.IsItemChecked(index))
+
+
+class MigrationNudgeDialog(wx.Dialog):
+	"""Three-choice prompt shown when the editor detects legacy dictionaries."""
+
+	def __init__(self, parent: wx.Window):
+		super().__init__(
+			parent,
+			# Translators: Title of the prompt shown when old Eloquence dictionary files are detected.
+			title=_("Old Eloquence Dictionary Files"),
+		)
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer_helper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		message = wx.StaticText(
+			self,
+			# Translators: Prompt shown when dictionary files from before this add-on are detected.
+			label=_(
+				"Old dictionary files from before this add-on were found. Review and import your hand edits now?",
+			),
+		)
+		message.Wrap(440)
+		sizer_helper.addItem(message)
+		button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
+		yes_button = button_helper.addButton(
+			self,
+			id=wx.ID_YES,
+			# Translators: Button that opens the old Eloquence dictionary review now.
+			label=_("&Yes"),
+		)
+		yes_button.SetDefault()
+		yes_button.Bind(wx.EVT_BUTTON, lambda _event: self.EndModal(wx.ID_YES))
+		later_button = button_helper.addButton(
+			self,
+			id=wx.ID_CANCEL,
+			# Translators: Button that postpones the old Eloquence dictionary review until a later editor session.
+			label=_("&Later"),
+		)
+		later_button.Bind(wx.EVT_BUTTON, lambda _event: self.EndModal(wx.ID_CANCEL))
+		dismiss_button = button_helper.addButton(
+			self,
+			id=wx.ID_NO,
+			# Translators: Button that permanently dismisses the old Eloquence dictionary prompt.
+			label=_("&Don't ask again"),
+		)
+		dismiss_button.Bind(wx.EVT_BUTTON, lambda _event: self.EndModal(wx.ID_NO))
+		outer_sizer.Add(
+			sizer_helper.sizer,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			button_helper.sizer,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+
+
 class EloquenceDictionariesDialog(SettingsDialog):
 	"""Standalone editor for effective and personal pronunciation entries."""
 
@@ -482,6 +653,8 @@ class EloquenceDictionariesDialog(SettingsDialog):
 				diagnostic.path,
 				diagnostic.reason,
 			)
+		self._migration_discovery = discover_migration_candidates(_available_provider_paths())
+		self._logMigrationDiagnostics(self._migration_discovery.diagnostics)
 		self._views: dict[tuple[str, str | None], EffectiveView] = {}
 		self._rows: tuple[EffectiveRow, ...] = ()
 		self._language_codes: tuple[str, ...] = ()
@@ -669,6 +842,12 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			label=_("E&xport..."),
 		)
 		self._export_button.Bind(wx.EVT_BUTTON, self._onExport)
+		self._migration_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for reviewing and importing hand edits from old Eloquence dictionary files.
+			label=_("Import from &old Eloquence dictionary files..."),
+		)
+		self._migration_button.Bind(wx.EVT_BUTTON, self._onMigrationImport)
 		button_helper.sizer.AddStretchSpacer()
 		self._remove_all_button = button_helper.addButton(
 			parent=self,
@@ -688,6 +867,15 @@ class EloquenceDictionariesDialog(SettingsDialog):
 	def _current_managed_set(self) -> ManagedSet | None:
 		selection = self._set_choice.GetSelection()
 		return self._managed_sets[selection] if selection < len(self._managed_sets) else None
+
+	@staticmethod
+	def _logMigrationDiagnostics(diagnostics: tuple[MigrationDiagnostic, ...]) -> None:
+		for diagnostic in diagnostics:
+			log.warning(
+				"Eloquence Dictionary Manager ignored old dictionary location %s: %s",
+				diagnostic.path,
+				diagnostic.reason,
+			)
 
 	def _current_view(self) -> EffectiveView:
 		language = self._current_language()
@@ -1033,6 +1221,107 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		)
 		self._entry_list.SetFocus()
 
+	def _showMigrationReview(self, candidates: tuple[MigrationCandidate, ...]) -> None:
+		try:
+			rows = classify_migration_candidates(candidates, self._overlay, HistoricalUnion())
+		except HistoricalUnionFormatError as error:
+			message = _(
+				# Translators: Migration error message. {error} describes why the shipped historical data could not be read.
+				"The old Eloquence dictionary entries could not be reviewed.\n\n{error}",
+			).format(error=error)
+			wx.MessageBox(
+				message,
+				# Translators: Title of an error shown when old Eloquence dictionary entries cannot be reviewed.
+				_("Migration Import Error"),
+				wx.OK | wx.ICON_ERROR,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+		if not rows:
+			wx.MessageBox(
+				# Translators: Message shown when old dictionary files contain no likely hand edits to review.
+				_(
+					"No entries to import were found. "
+					"All readable entries are known upstream content or already match your personal entries.",
+				),
+				# Translators: Title of migration information shown when there is nothing new to review.
+				_("Import from Old Eloquence Dictionary Files"),
+				wx.OK | wx.ICON_INFORMATION,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+
+		dialog = MigrationReviewDialog(self, rows)
+		result = dialog.ShowModal()
+		checked_rows = dialog.checked_rows
+		dialog.Destroy()
+		if result != wx.ID_OK:
+			self._entry_list.SetFocus()
+			return
+		try:
+			_imported = apply_migration_candidates(self._overlay, checked_rows)
+		except EntryValidationError as error:
+			wx.MessageBox(
+				str(error),
+				# Translators: Title of an error shown if a checked old dictionary entry cannot be imported.
+				_("Migration Import Error"),
+				wx.OK | wx.ICON_ERROR,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+		self._refreshAfterMutation()
+
+	def _onMigrationImport(self, _event: wx.CommandEvent) -> None:
+		discovery = discover_migration_candidates(_available_provider_paths())
+		self._logMigrationDiagnostics(discovery.diagnostics)
+		if discovery.scan is not None and discovery.scan.candidates:
+			self._showMigrationReview(discovery.scan.candidates)
+			return
+
+		folder_dialog = wx.DirDialog(
+			self,
+			# Translators: Title of the folder picker for manually locating old Eloquence dictionary files.
+			message=_("Select Old Eloquence Dictionary Folder"),
+			defaultPath=wx.StandardPaths.Get().GetDocumentsDir(),
+			style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+		)
+		result = folder_dialog.ShowModal()
+		folder_path = Path(folder_dialog.GetPath()) if result == wx.ID_OK else None
+		folder_dialog.Destroy()
+		if folder_path is None:
+			self._entry_list.SetFocus()
+			return
+		scan = scan_migration_directory(folder_path)
+		self._logMigrationDiagnostics(scan.diagnostics)
+		if not scan.candidates:
+			wx.MessageBox(
+				# Translators: Message shown when a selected folder contains no readable supported Eloquence dictionary entries.
+				_("No readable Eloquence dictionary entries were found in that folder."),
+				# Translators: Title of migration information shown when a selected folder has no import candidates.
+				_("Import from Old Eloquence Dictionary Files"),
+				wx.OK | wx.ICON_INFORMATION,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+		self._showMigrationReview(scan.candidates)
+
+	def _showMigrationNudge(self) -> None:
+		scan = self._migration_discovery.scan
+		if scan is None or not scan.candidates or bool(config.conf[CONFIG_SECTION]["migrationDismissed"]):
+			return
+		dialog = MigrationNudgeDialog(self)
+		result = dialog.ShowModal()
+		dialog.Destroy()
+		if result == wx.ID_YES:
+			self._showMigrationReview(scan.candidates)
+		elif result == wx.ID_NO:
+			config.conf[CONFIG_SECTION]["migrationDismissed"] = True
+		self._entry_list.SetFocus()
+
 	def _onExport(self, _event: wx.CommandEvent) -> None:
 		scope_dialog = ExportScopeDialog(self)
 		result = scope_dialog.ShowModal()
@@ -1107,6 +1396,7 @@ class EloquenceDictionariesDialog(SettingsDialog):
 	def postInit(self) -> None:
 		self._refresh_rows()
 		self._entry_list.SetFocus()
+		self._showMigrationNudge()
 
 	@override
 	def onOk(self, evt: wx.CommandEvent) -> None:
