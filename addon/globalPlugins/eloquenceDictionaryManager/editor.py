@@ -21,7 +21,15 @@ import synthDriverHandler
 import ui
 import wx
 
-from .ecidic.artifact import export_edm_dict_artifact
+from .ecidic.artifact import (
+	CollisionResolution,
+	ImportMode,
+	InvalidArtifactError,
+	apply_import_plan,
+	build_import_plan,
+	export_edm_dict_artifact,
+	read_edm_dict_artifact,
+)
 from .ecidic.effective import EffectiveRow, EffectiveView, RowKind, ShowFilter
 from .ecidic.languages import LANGUAGES
 from .ecidic.model import Entry, Slot
@@ -397,6 +405,60 @@ class ExportScopeDialog(wx.Dialog):
 		return self._scope_control.GetSelection() == 1
 
 
+class ImportModeDialog(wx.Dialog):
+	"""Modal chooser for adding or replacing Personal Dictionary Overlay entries."""
+
+	def __init__(self, parent: wx.Window):
+		super().__init__(
+			parent,
+			title=_(
+				# Translators: Title of the dialog for choosing how personal dictionary entries are imported.
+				"Import Dictionary Entries",
+			),
+		)
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		self._mode_control = wx.RadioBox(
+			self,
+			label=_(
+				# Translators: Label for choosing how imported dictionary entries affect existing personal entries.
+				"Import &mode",
+			),
+			choices=[
+				_(
+					# Translators: Import-mode choice that merges imported entries into existing personal entries.
+					"Add to your entries",
+				),
+				_(
+					# Translators: Import-mode choice that clears personal entries for artifact languages before importing.
+					"Replace your entries for the languages in the file",
+				),
+			],
+			majorDimension=1,
+			style=wx.RA_SPECIFY_COLS,
+		)
+		self._mode_control.SetSelection(0)
+		outer_sizer.Add(
+			self._mode_control,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL),
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+		self._mode_control.SetFocus()
+
+	@property
+	def mode(self) -> ImportMode:
+		"""Return the selected import mode."""
+
+		return ImportMode.REPLACE if self._mode_control.GetSelection() == 1 else ImportMode.MERGE
+
+
 class EloquenceDictionariesDialog(SettingsDialog):
 	"""Standalone editor for effective and personal pronunciation entries."""
 
@@ -593,6 +655,14 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			label=_("&Remove"),
 		)
 		self._remove_button.Bind(wx.EVT_BUTTON, self._onRemove)
+		self._import_button = button_helper.addButton(
+			parent=self,
+			label=_(
+				# Translators: Button for importing personal dictionary entries from a shareable file.
+				"&Import...",
+			),
+		)
+		self._import_button.Bind(wx.EVT_BUTTON, self._onImport)
 		self._export_button = button_helper.addButton(
 			parent=self,
 			# Translators: Button for exporting personal dictionary entries to a shareable file.
@@ -827,6 +897,141 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		focus_target = (selected_row.word, selected_row.slot) if selected_row is not None else None
 		_removed = self._overlay.remove_language(language)
 		self._refreshAfterMutation(focus_target, selection)
+
+	def _onImport(self, _event: wx.CommandEvent) -> None:
+		file_dialog = wx.FileDialog(
+			self,
+			message=_(
+				# Translators: Title of the open dialog for importing a dictionary artifact.
+				"Import Dictionary Entries",
+			),
+			defaultDir=wx.StandardPaths.Get().GetDocumentsDir(),
+			wildcard=_(
+				# Translators: File types shown in the open dialog for Eloquence dictionary artifacts and the all-files fallback.
+				"Eloquence dictionary files (*.edm-dict)|*.edm-dict|All files (*.*)|*.*",
+			),
+			style=wx.FD_OPEN,
+		)
+		result = file_dialog.ShowModal()
+		import_path = Path(file_dialog.GetPath()) if result == wx.ID_OK else None
+		file_dialog.Destroy()
+		if import_path is None:
+			self._entry_list.SetFocus()
+			return
+
+		try:
+			artifact = read_edm_dict_artifact(import_path.read_bytes())
+		except (InvalidArtifactError, OSError) as error:
+			message = _(
+				# Translators: Import error message. {error} describes why the artifact could not be read or accepted.
+				"The dictionary entries could not be imported.\n\n{error}",
+			).format(error=error)
+			wx.MessageBox(
+				message,
+				_(
+					# Translators: Title of an error shown when dictionary entries cannot be imported.
+					"Import Error",
+				),
+				wx.OK | wx.ICON_ERROR,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+
+		mode_dialog = ImportModeDialog(self)
+		result = mode_dialog.ShowModal()
+		mode = mode_dialog.mode
+		mode_dialog.Destroy()
+		if result != wx.ID_OK:
+			self._entry_list.SetFocus()
+			return
+
+		plan = build_import_plan(artifact, self._overlay)
+		collision_resolution = CollisionResolution.KEEP_PERSONAL
+		if mode is ImportMode.MERGE and plan.collision_count:
+			collision_message = ngettext(
+				# Translators: Import collision summary for one entry. {count} is the collision count.
+				"The imported file has {count} entry that matches one of your entries. Choose how to resolve this collision.",
+				# Translators: Import collision summary for multiple entries. {count} is the collision count.
+				"The imported file has {count} entries that match your entries. Choose how to resolve all collisions.",
+				plan.collision_count,
+			).format(count=plan.collision_count)
+			collision_dialog = wx.MessageDialog(
+				self,
+				collision_message,
+				_(
+					# Translators: Title of the prompt for resolving imported dictionary entry collisions.
+					"Import Dictionary Entries",
+				),
+				wx.YES_NO | wx.YES_DEFAULT | wx.ICON_QUESTION,
+			)
+			collision_dialog.SetYesNoLabels(
+				_(
+					# Translators: Default collision choice that preserves all existing personal entries.
+					"Keep my entries",
+				),
+				_(
+					# Translators: Collision choice that replaces all matching personal entries with imported entries.
+					"Use the imported entries",
+				),
+			)
+			collision_result = collision_dialog.ShowModal()
+			collision_dialog.Destroy()
+			if collision_result not in (wx.ID_YES, wx.ID_NO):
+				self._entry_list.SetFocus()
+				return
+			if collision_result == wx.ID_NO:
+				collision_resolution = CollisionResolution.USE_IMPORTED
+
+		import_result = apply_import_plan(
+			self._overlay,
+			plan,
+			mode,
+			collision_resolution,
+		)
+		self._refreshAfterMutation()
+		summary = "\n".join(
+			(
+				ngettext(
+					# Translators: Import completion count for one imported dictionary entry. {count} is the imported count.
+					"{count} entry was imported.",
+					# Translators: Import completion count for multiple imported dictionary entries. {count} is the imported count.
+					"{count} entries were imported.",
+					import_result.imported,
+				).format(count=import_result.imported),
+				ngettext(
+					# Translators: Import completion count for one invalid skipped dictionary entry. {count} is the skipped count.
+					"{count} invalid entry was skipped.",
+					# Translators: Import completion count for multiple invalid skipped dictionary entries. {count} is the skipped count.
+					"{count} invalid entries were skipped.",
+					import_result.skipped_invalid,
+				).format(count=import_result.skipped_invalid),
+				ngettext(
+					# Translators: Import completion count for one collision that preserved the user's entry. {count} is the collision count.
+					"{count} collision kept your existing entry.",
+					# Translators: Import completion count for multiple collisions that preserved the user's entries. {count} is the collision count.
+					"{count} collisions kept your existing entries.",
+					import_result.collisions_kept,
+				).format(count=import_result.collisions_kept),
+				ngettext(
+					# Translators: Import completion count for one collision replaced by the imported entry. {count} is the collision count.
+					"{count} collision used the imported entry.",
+					# Translators: Import completion count for multiple collisions replaced by imported entries. {count} is the collision count.
+					"{count} collisions used the imported entries.",
+					import_result.collisions_replaced,
+				).format(count=import_result.collisions_replaced),
+			),
+		)
+		wx.MessageBox(
+			summary,
+			_(
+				# Translators: Title of the successful dictionary-import completion summary.
+				"Import Dictionary Entries",
+			),
+			wx.OK | wx.ICON_INFORMATION,
+			self,
+		)
+		self._entry_list.SetFocus()
 
 	def _onExport(self, _event: wx.CommandEvent) -> None:
 		scope_dialog = ExportScopeDialog(self)
