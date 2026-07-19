@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import cast, override
 
@@ -20,6 +21,7 @@ import synthDriverHandler
 import ui
 import wx
 
+from .ecidic.artifact import export_edm_dict_artifact
 from .ecidic.effective import EffectiveRow, EffectiveView, RowKind, ShowFilter
 from .ecidic.languages import LANGUAGES
 from .ecidic.model import Entry, Slot
@@ -93,6 +95,25 @@ def _available_provider_paths() -> tuple[Path, ...]:
 	return tuple(
 		Path(addon.path) for addon in addonHandler.getAvailableAddons() if not addon.isPendingInstall
 	)
+
+
+def _currentAddonVersion() -> str:
+	"""Return this add-on's installed version, with a defensive development fallback."""
+
+	try:
+		version = cast(object, addonHandler.getCodeAddon().manifest["version"])
+	except (addonHandler.AddonError, AttributeError, KeyError, TypeError):
+		log.debugWarning(
+			"Eloquence Dictionary Manager could not determine its installed version; using 0.0.0",
+			exc_info=True,
+		)
+		return "0.0.0"
+	if not isinstance(version, str) or not version:
+		log.debugWarning(
+			"Eloquence Dictionary Manager has no usable installed version; using 0.0.0",
+		)
+		return "0.0.0"
+	return version
 
 
 class EntryDialog(wx.Dialog):
@@ -330,6 +351,52 @@ class SetDetailsDialog(wx.Dialog):
 		self._name_control.SetFocus()
 
 
+class ExportScopeDialog(wx.Dialog):
+	"""Modal chooser for the language scope of a Personal Dictionary Overlay export."""
+
+	def __init__(self, parent: wx.Window):
+		super().__init__(
+			parent,
+			# Translators: Title of the dialog for choosing which languages to export.
+			title=_("Export Dictionary Entries"),
+		)
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		self._scope_control = wx.RadioBox(
+			self,
+			# Translators: Label for choosing the language scope of a dictionary export.
+			label=_("Export &scope"),
+			choices=[
+				# Translators: Export-scope choice that includes only the language currently shown in the editor.
+				_("Shown language only"),
+				# Translators: Export-scope choice that includes personal entries from every language.
+				_("All languages"),
+			],
+			majorDimension=1,
+			style=wx.RA_SPECIFY_COLS,
+		)
+		self._scope_control.SetSelection(0)
+		outer_sizer.Add(
+			self._scope_control,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL),
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+		self._scope_control.SetFocus()
+
+	@property
+	def all_languages(self) -> bool:
+		"""Whether the user selected the all-languages scope."""
+
+		return self._scope_control.GetSelection() == 1
+
+
 class EloquenceDictionariesDialog(SettingsDialog):
 	"""Standalone editor for effective and personal pronunciation entries."""
 
@@ -526,6 +593,12 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			label=_("&Remove"),
 		)
 		self._remove_button.Bind(wx.EVT_BUTTON, self._onRemove)
+		self._export_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for exporting personal dictionary entries to a shareable file.
+			label=_("E&xport..."),
+		)
+		self._export_button.Bind(wx.EVT_BUTTON, self._onExport)
 		button_helper.sizer.AddStretchSpacer()
 		self._remove_all_button = button_helper.addButton(
 			parent=self,
@@ -754,6 +827,76 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		focus_target = (selected_row.word, selected_row.slot) if selected_row is not None else None
 		_removed = self._overlay.remove_language(language)
 		self._refreshAfterMutation(focus_target, selection)
+
+	def _onExport(self, _event: wx.CommandEvent) -> None:
+		scope_dialog = ExportScopeDialog(self)
+		result = scope_dialog.ShowModal()
+		all_languages = scope_dialog.all_languages
+		scope_dialog.Destroy()
+		if result != wx.ID_OK:
+			self._entry_list.SetFocus()
+			return
+
+		if all_languages:
+			scope_languages = tuple(LANGUAGES)
+			# Translators: Phrase used in an export filename when entries from every language are included.
+			filename_language = _("all languages")
+		else:
+			current_language = self._current_language()
+			scope_languages = (current_language,)
+			filename_language = _language_display_names()[current_language]
+		default_filename = _(
+			# Translators: Default export filename. {language} is a localized language name or "all languages"; {date} is today's date in YYYY-MM-DD form.
+			"Eloquence dictionary entries - {language} - {date}.edm-dict",
+		).format(language=filename_language, date=date.today().isoformat())
+		file_dialog = wx.FileDialog(
+			self,
+			# Translators: Title of the save dialog for an exported dictionary artifact.
+			message=_("Export Dictionary Entries"),
+			defaultDir=wx.StandardPaths.Get().GetDocumentsDir(),
+			defaultFile=default_filename,
+			# Translators: File type shown in the save dialog for Eloquence dictionary artifacts.
+			wildcard=_("Eloquence dictionary files (*.edm-dict)|*.edm-dict"),
+			style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+		)
+		result = file_dialog.ShowModal()
+		export_path = Path(file_dialog.GetPath()) if result == wx.ID_OK else None
+		file_dialog.Destroy()
+		if export_path is None:
+			self._entry_list.SetFocus()
+			return
+
+		try:
+			artifact_bytes = export_edm_dict_artifact(
+				self._overlay,
+				scope_languages,
+				_currentAddonVersion(),
+			)
+			export_path.write_bytes(artifact_bytes)
+		except (EntryValidationError, DictionaryEncodingError, OSError) as error:
+			message = _(
+				# Translators: Export error message. {error} describes why the artifact could not be written.
+				"The dictionary entries could not be exported.\n\n{error}",
+			).format(error=error)
+			wx.MessageBox(
+				message,
+				# Translators: Title of an error shown when dictionary entries cannot be exported.
+				_("Export Error"),
+				wx.OK | wx.ICON_ERROR,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+
+		wx.MessageBox(
+			# Translators: Confirmation shown after personal dictionary entries are exported successfully.
+			_("Your personal dictionary entries were exported successfully."),
+			# Translators: Title of the successful dictionary-export confirmation.
+			_("Export Dictionary Entries"),
+			wx.OK | wx.ICON_INFORMATION,
+			self,
+		)
+		self._entry_list.SetFocus()
 
 	@override
 	def postInit(self) -> None:
