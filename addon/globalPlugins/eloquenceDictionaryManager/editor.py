@@ -211,6 +211,89 @@ class EntryDialog(wx.Dialog):
 		self.EndModal(wx.ID_OK)
 
 
+class SetDetailsDialog(wx.Dialog):
+	"""Read-only provenance details for one Managed Dictionary Set."""
+
+	def __init__(self, parent: wx.Window, managed_set: ManagedSet):
+		# Translators: Title of the dialog showing Managed Dictionary Set provenance details.
+		super().__init__(parent, title=_("Managed Dictionary Set Details"))
+
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer_helper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		self._name_control = sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set name.
+			_("&Name:"),
+			wx.TextCtrl,
+			value=managed_set.name,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set attribution or legal notice.
+			_("&Attribution:"),
+			wx.TextCtrl,
+			value=managed_set.attribution,
+			size=cast("wx.Size", (440, 80)),
+			style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set source URL.
+			_("Source &URL:"),
+			wx.TextCtrl,
+			value=managed_set.source_url,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set license identifier.
+			_("&License:"),
+			wx.TextCtrl,
+			value=managed_set.license,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set license URL.
+			_("License U&RL:"),
+			wx.TextCtrl,
+			value=managed_set.license_url,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the Managed Dictionary Set source version.
+			_("Source &version:"),
+			wx.TextCtrl,
+			value=managed_set.source_version,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+		sizer_helper.addLabeledControl(
+			# Translators: Label for the full Managed Dictionary Set source revision.
+			_("Source &revision:"),
+			wx.TextCtrl,
+			value=managed_set.source_revision,
+			size=cast("wx.Size", (440, -1)),
+			style=wx.TE_READONLY,
+		)
+
+		outer_sizer.Add(
+			sizer_helper.sizer,
+			proportion=1,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			self.CreateStdDialogButtonSizer(wx.OK),
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+		self._name_control.SetFocus()
+
+
 class EloquenceDictionariesDialog(SettingsDialog):
 	"""Standalone editor for effective and personal pronunciation entries."""
 
@@ -395,6 +478,12 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			label=_("&Edit"),
 		)
 		self._edit_button.Bind(wx.EVT_BUTTON, self._onEdit)
+		self._set_details_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for showing provenance details for the selected Managed Dictionary Set entry.
+			label=_("Set &Details..."),
+		)
+		self._set_details_button.Bind(wx.EVT_BUTTON, self._onSetDetails)
 		self._remove_button = button_helper.addButton(
 			parent=self,
 			# Translators: Button for removing a selected personal dictionary entry.
@@ -447,6 +536,9 @@ class EloquenceDictionariesDialog(SettingsDialog):
 	def _updateButtons(self) -> None:
 		row = self._selected_row()
 		self._edit_button.Enable(row is not None)
+		self._set_details_button.Enable(
+			row is not None and row.kind is RowKind.MANAGED and self._current_managed_set() is not None,
+		)
 		self._remove_button.Enable(
 			row is not None and row.kind in (RowKind.PERSONAL, RowKind.OVERRIDE),
 		)
@@ -568,6 +660,16 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		self._overlay.remove_entry(language, row.slot, row.word)
 		self._overlay.set_entry(language, slot, entry)
 		self._refreshAfterMutation((entry.key, slot))
+
+	def _onSetDetails(self, _event: wx.CommandEvent) -> None:
+		row = self._selected_row()
+		managed_set = self._current_managed_set()
+		if row is None or row.kind is not RowKind.MANAGED or managed_set is None:
+			return
+		dialog = SetDetailsDialog(self, managed_set)
+		dialog.ShowModal()
+		dialog.Destroy()
+		self._entry_list.SetFocus()
 
 	def _onRemove(self, _event: wx.CommandEvent) -> None:
 		selection = cast(int, self._entry_list.GetFirstSelected())
