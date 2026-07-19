@@ -298,7 +298,7 @@ def process_upstream_tree(
 			parsed = parse_dictionary_filename(path.name)
 		except ValueError as error:
 			raise VendoringError(
-				f"Unsupported upstream dictionary filename {path.name!r}: {error}"
+				f"Unsupported upstream dictionary filename {path.name!r}: {error}",
 			) from error
 		canonical_name = parsed.canonical_name
 		if canonical_name in result:
@@ -512,7 +512,8 @@ def verify_tree(repo_root: Path, lock: SourceLock) -> list[str]:
 
 def _github_json(url: str) -> Mapping[str, object]:
 	request = urllib.request.Request(
-		url, headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT}
+		url,
+		headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
 	)
 	with cast(BinaryIO, urllib.request.urlopen(request)) as response:
 		payload = json.load(response)
