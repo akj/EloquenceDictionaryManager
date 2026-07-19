@@ -1,5 +1,13 @@
 """NVDA-independent domain support for Western ECI ``.dic`` files."""
 
+from .historicalunion import (
+	HistoricalUnion,
+	HistoricalUnionFormatError,
+	historical_artifact_name,
+	historical_line_digest,
+	normalize_historical_line,
+	validate_historical_artifact,
+)
 from .languages import LANGUAGES, Language, UnsupportedLanguageError, get_language
 from .model import Entry, Slot
 from .parsing import (
@@ -41,6 +49,8 @@ __all__ = [
 	"Entry",
 	"EntryValidationError",
 	"Field",
+	"HistoricalUnion",
+	"HistoricalUnionFormatError",
 	"Language",
 	"Slot",
 	"UnsupportedLanguageError",
@@ -51,14 +61,18 @@ __all__ = [
 	"find_dictionary_file",
 	"find_unencodable_character",
 	"get_language",
+	"historical_artifact_name",
+	"historical_line_digest",
 	"key_identity",
 	"load_dictionary_file",
 	"merge_entries",
 	"normalize_entry",
+	"normalize_historical_line",
 	"parse_dictionary_bytes",
 	"parse_dictionary_filename",
 	"serialize_dictionary_bytes",
 	"validate_entry",
+	"validate_historical_artifact",
 	"validate_or_raise",
 	"validated_entry",
 	"write_dictionary_file",
