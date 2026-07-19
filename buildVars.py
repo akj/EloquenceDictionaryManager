@@ -26,8 +26,8 @@ addon_info = AddonInfo(
 	# version
 	addon_version="0.1.0",
 	# Brief changelog for this version
-	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(
+		# Translators: what's new content for the add-on version to be shown in the add-on store
 		"Adds the bundled IBMTTSDictionaries set, personal-entry editing and sharing, and migration of hand edits from old Eloquence dictionary files.",
 	),
 	# Author(s)

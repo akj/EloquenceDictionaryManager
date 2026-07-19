@@ -585,8 +585,8 @@ class MigrationNudgeDialog(wx.Dialog):
 		sizer_helper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
 		message = wx.StaticText(
 			self,
-			# Translators: Prompt shown when dictionary files from before this add-on are detected.
 			label=_(
+				# Translators: Prompt shown when dictionary files from before this add-on are detected.
 				"Old dictionary files from before this add-on were found. Review and import your hand edits now?",
 			),
 		)
@@ -1225,10 +1225,14 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		try:
 			rows = classify_migration_candidates(candidates, self._overlay, HistoricalUnion())
 		except HistoricalUnionFormatError as error:
+			log.error(
+				"Eloquence Dictionary Manager could not read its bundled historical data: %s",
+				error,
+			)
 			message = _(
-				# Translators: Migration error message. {error} describes why the shipped historical data could not be read.
-				"The old Eloquence dictionary entries could not be reviewed.\n\n{error}",
-			).format(error=error)
+				# Translators: Migration error shown when the add-on's bundled historical data cannot be read.
+				"The old Eloquence dictionary entries could not be reviewed because the add-on's bundled historical data could not be read. See the NVDA log for details.",
+			)
 			wx.MessageBox(
 				message,
 				# Translators: Title of an error shown when old Eloquence dictionary entries cannot be reviewed.
