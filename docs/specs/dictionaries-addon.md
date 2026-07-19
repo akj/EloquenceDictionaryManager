@@ -448,8 +448,11 @@ without copying upstream content into the overlay. Its behavior is resolved in
 
 At build time, the pinned offline refresh workflow builds hashed line sets for
 each `(language, slot)` from every historical revision of both upstream
-repositories. A normalized line has a canonical line ending and the exact
-`key<TAB>value` bytes; root keys alone are case-folded. Hashes are not
+repositories. After source bytes are decoded and a line is parsed, normalization
+omits the line ending, removes leading tabs from the value, and case-folds root
+keys alone; all other key and value text remains exact. The resulting
+`key<TAB>value` text is re-encoded as UTF-8 before SHA-256 hashing, as recorded by
+`normalized_line_encoding = utf-8` in `historicalUnion.lock.ini`. Hashes are not
 redistribution, so the artifact includes the full
 AltIBMTTSDictionaries history even though that set is not bundled.
 
