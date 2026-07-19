@@ -1,4 +1,4 @@
-"""Read-only effective-entry editor dialog for Eloquence dictionaries."""
+"""Effective-entry editor dialog for Eloquence dictionaries."""
 
 # The wx stubs leave many member types partially unknown, and wx GUI construction
 # discards returned sizer items pervasively, so relax those two rules file-wide.
@@ -17,11 +17,13 @@ from logHandler import log
 import NVDAState
 import wx
 
-from .ecidic.effective import EffectiveRow, EffectiveView, ShowFilter
+from .ecidic.effective import EffectiveRow, EffectiveView, RowKind, ShowFilter
 from .ecidic.languages import LANGUAGES
-from .ecidic.model import Slot
-from .ecidic.overlay import load_personal_overlay
+from .ecidic.model import Entry, Slot
+from .ecidic.overlay import load_personal_overlay, save_personal_overlay
+from .ecidic.parsing import DictionaryEncodingError, key_identity
 from .ecidic.sets import ManagedSet, discover_managed_sets
+from .ecidic.validation import EntryValidationError, Field, normalize_entry, validate_entry
 
 
 addonHandler.initTranslation()
@@ -63,14 +65,154 @@ def _slot_labels() -> dict[Slot, str]:
 	}
 
 
+def _entry_rules() -> dict[Slot, str]:
+	return {
+		Slot.MAIN: _(
+			# Translators: Rules shown for an exact-word dictionary entry.
+			'Matches the word exactly as written — capitalization counts, so "NASA" and "nasa" are separate entries. The word cannot contain spaces or end with punctuation. The pronunciation may be words, phonetic strings like `[.1kwi.0nwa], or emphasis codes `0 (flat) through `4 (strongest).',
+		),
+		Slot.ROOT: _(
+			# Translators: Rules shown for a word-root dictionary entry.
+			'Matches a word and all of its forms — "figure" also covers figures, figured, figuring — ignoring capitalization. Roots are stored in lowercase and can contain only letters. The pronunciation must be a single word or one phonetic string (`[...]).',
+		),
+		Slot.ABBREVIATION: _(
+			# Translators: Rules shown for an abbreviation dictionary entry.
+			'Matches an abbreviation written with letters and periods — capitalization counts. A trailing period is meaningful: "approx." matches only "approx.", while "approx" matches both "approx" and "approx.". The expansion must be plain words.',
+		),
+	}
+
+
+_SLOT_ORDER = (Slot.MAIN, Slot.ROOT, Slot.ABBREVIATION)
+
+
 def _available_provider_paths() -> tuple[Path, ...]:
 	return tuple(
 		Path(addon.path) for addon in addonHandler.getAvailableAddons() if not addon.isPendingInstall
 	)
 
 
+class EntryDialog(wx.Dialog):
+	"""Modal editor for one Personal Dictionary Overlay entry."""
+
+	def __init__(
+		self,
+		parent: wx.Window,
+		title: str,
+		language: str,
+		*,
+		slot: Slot = Slot.MAIN,
+		entry: Entry | None = None,
+		lock_type: bool = False,
+		lock_word: bool = False,
+	):
+		super().__init__(parent, title=title)
+		self._language = language
+		self.entry: Entry | None = None
+		self.slot = slot
+		initial_entry = entry or Entry("", "")
+
+		outer_sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer_helper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+		self._word_control = sizer_helper.addLabeledControl(
+			# Translators: Label for the dictionary entry word field.
+			_("&Word:"),
+			wx.TextCtrl,
+			value=initial_entry.key,
+			size=(300, -1),
+		)
+		self._word_control.Enable(not lock_word)
+		self._pronunciation_control = sizer_helper.addLabeledControl(
+			# Translators: Label for the dictionary entry pronunciation field.
+			_("&Pronunciation:"),
+			wx.TextCtrl,
+			value=initial_entry.value,
+			size=(300, -1),
+		)
+		self._type_control = wx.RadioBox(
+			self,
+			# Translators: Label for choosing the dictionary entry type.
+			label=_("&Type"),
+			choices=[
+				# Translators: Entry type choice for an exact-word dictionary entry.
+				_("Exact word"),
+				# Translators: Entry type choice for a word-root dictionary entry.
+				_("Word root (matches all word forms)"),
+				# Translators: Entry type choice for an abbreviation dictionary entry.
+				_("Abbreviation"),
+			],
+			majorDimension=1,
+			style=wx.RA_SPECIFY_COLS,
+		)
+		self._type_control.SetSelection(_SLOT_ORDER.index(slot))
+		self._type_control.Enable(not lock_type)
+		self._type_control.Bind(wx.EVT_RADIOBOX, self._onTypeChanged)
+		sizer_helper.addItem(self._type_control)
+		sizer_helper.addItem(
+			wx.StaticText(
+				self,
+				# Translators: Label for the read-only dictionary entry rules text.
+				label=_("Rule&s:"),
+			),
+		)
+		self._rules_control = wx.TextCtrl(
+			self,
+			value=_entry_rules()[slot],
+			size=cast("wx.Size", (440, 80)),
+			style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP,
+		)
+		sizer_helper.addItem(self._rules_control, flag=wx.EXPAND)
+
+		outer_sizer.Add(
+			sizer_helper.sizer,
+			proportion=1,
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		outer_sizer.Add(wx.StaticLine(self), flag=wx.EXPAND)
+		outer_sizer.Add(
+			self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL),
+			flag=wx.EXPAND | wx.ALL,
+			border=guiHelper.BORDER_FOR_DIALOGS,
+		)
+		self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
+		self.SetSizerAndFit(outer_sizer)
+		self.CentreOnParent()
+		self._word_control.SetFocus()
+
+	def _selectedSlot(self) -> Slot:
+		return _SLOT_ORDER[self._type_control.GetSelection()]
+
+	def _onTypeChanged(self, _event: wx.CommandEvent) -> None:
+		self._rules_control.SetValue(_entry_rules()[self._selectedSlot()])
+
+	def onOk(self, _event: wx.CommandEvent) -> None:
+		entry = Entry(
+			key=self._word_control.GetValue().strip(),
+			value=self._pronunciation_control.GetValue().strip(),
+		)
+		slot = self._selectedSlot()
+		issues = validate_entry(entry, slot, self._language)
+		if issues:
+			issue = issues[0]
+			wx.MessageBox(
+				issue.message,
+				# Translators: Title of a validation warning in the dictionary entry dialog.
+				_("Dictionary Entry Error"),
+				wx.OK | wx.ICON_WARNING,
+				self,
+			)
+			if issue.field is Field.KEY:
+				self._word_control.SetFocus()
+			else:
+				self._pronunciation_control.SetFocus()
+			return
+		self.entry = normalize_entry(entry, slot)
+		self.slot = slot
+		self.EndModal(wx.ID_OK)
+
+
 class EloquenceDictionariesDialog(SettingsDialog):
-	"""Standalone read-only editor for the effective pronunciation entries."""
+	"""Standalone editor for effective and personal pronunciation entries."""
 
 	# Translators: Title of the Eloquence dictionary entries editor.
 	title = _("Eloquence Dictionary Entries")
@@ -84,8 +226,8 @@ class EloquenceDictionariesDialog(SettingsDialog):
 				diagnostic.reason,
 			)
 		self._managed_sets = tuple(sorted(managed_sets, key=lambda item: item.name.casefold()))
-		overlay_directory = Path(NVDAState.WritePaths.configDir) / "eciDictionaries" / "personal"
-		self._overlay, overlay_diagnostics = load_personal_overlay(overlay_directory)
+		self._overlay_directory = Path(NVDAState.WritePaths.configDir) / "eciDictionaries" / "personal"
+		self._overlay, overlay_diagnostics = load_personal_overlay(self._overlay_directory)
 		for diagnostic in overlay_diagnostics:
 			log.warning(
 				"Eloquence Dictionary Manager ignored Personal Dictionary Overlay file %s: %s",
@@ -158,8 +300,8 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		sizer_helper.addItem(
 			wx.StaticText(
 				self,
-				# Translators: Explains that this dialog's Managed Dictionary Set choice is only a viewer.
 				label=_(
+					# Translators: Explains that this dialog's Managed Dictionary Set choice is only a viewer.
 					"Viewing only — the set your synthesizer uses is chosen in the synthesizer's settings.",
 				),
 			),
@@ -228,6 +370,8 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			itemTextCallable=self._getListItemText,
 			style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_VIRTUAL,
 		)
+		self._entry_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._onSelectionChanged)
+		self._entry_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._onSelectionChanged)
 		# Translators: Column header for the dictionary entry key.
 		self._entry_list.AppendColumn(_("Word"), width=cast(int, self.scaleSize(145)))
 		# Translators: Column header for the dictionary entry pronunciation.
@@ -237,6 +381,34 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		# Translators: Column header for the dictionary entry provenance.
 		self._entry_list.AppendColumn(_("Source"), width=cast(int, self.scaleSize(240)))
 		sizer_helper.addItem(self._entry_list, proportion=1, flag=wx.EXPAND)
+
+		button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
+		self._add_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for adding a personal dictionary entry.
+			label=_("&Add"),
+		)
+		self._add_button.Bind(wx.EVT_BUTTON, self._onAdd)
+		self._edit_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for editing or customizing a dictionary entry.
+			label=_("&Edit"),
+		)
+		self._edit_button.Bind(wx.EVT_BUTTON, self._onEdit)
+		self._remove_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for removing a selected personal dictionary entry.
+			label=_("&Remove"),
+		)
+		self._remove_button.Bind(wx.EVT_BUTTON, self._onRemove)
+		button_helper.sizer.AddStretchSpacer()
+		self._remove_all_button = button_helper.addButton(
+			parent=self,
+			# Translators: Button for removing all personal entries for the current language.
+			label=_("Remove all personal entries"),
+		)
+		self._remove_all_button.Bind(wx.EVT_BUTTON, self._onRemoveAll)
+		sizer_helper.addItem(button_helper, flag=wx.EXPAND)
 
 	def _defaultLanguage(self) -> str:
 		# Active-Eloquence-voice detection arrives with ticket #20.
@@ -268,7 +440,22 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			row.source,
 		)[column]
 
-	def _refresh_rows(self) -> None:
+	def _selected_row(self) -> EffectiveRow | None:
+		selection = cast(int, self._entry_list.GetFirstSelected())
+		return self._rows[selection] if 0 <= selection < len(self._rows) else None
+
+	def _updateButtons(self) -> None:
+		row = self._selected_row()
+		self._edit_button.Enable(row is not None)
+		self._remove_button.Enable(
+			row is not None and row.kind in (RowKind.PERSONAL, RowKind.OVERRIDE),
+		)
+
+	def _refresh_rows(
+		self,
+		focus_target: tuple[str, Slot] | None = None,
+		fallback_index: int = 0,
+	) -> None:
 		self._rows = self._current_view().rows(
 			self._filter_control.GetValue(),
 			self._show_filters[self._show_choice.GetSelection()],
@@ -276,16 +463,159 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		self._entry_list.SetItemCount(len(self._rows))
 		if self._rows:
 			self._entry_list.RefreshItems(0, len(self._rows) - 1)
-			self._entry_list.Select(0)
-			self._entry_list.Focus(0)
+			target_index = min(max(fallback_index, 0), len(self._rows) - 1)
+			if focus_target is not None:
+				target_word, target_slot = focus_target
+				target_identity = key_identity(target_word, target_slot)
+				for index, row in enumerate(self._rows):
+					if row.slot is target_slot and key_identity(row.word, row.slot) == target_identity:
+						target_index = index
+						break
+			self._entry_list.Select(target_index)
+			self._entry_list.Focus(target_index)
 		else:
 			self._entry_list.Refresh()
+		self._updateButtons()
+
+	def _refreshAfterMutation(
+		self,
+		focus_target: tuple[str, Slot] | None = None,
+		fallback_index: int = 0,
+	) -> None:
+		self._views.clear()
+		self._refresh_rows(focus_target, fallback_index)
+		self._entry_list.SetFocus()
 
 	def _onViewChanged(self, _event: wx.CommandEvent) -> None:
 		self._refresh_rows()
 
 	def _onFilterChanged(self, _event: wx.CommandEvent) -> None:
 		self._refresh_rows()
+
+	def _onSelectionChanged(self, _event: wx.ListEvent) -> None:
+		self._updateButtons()
+
+	def _confirmReplace(self, word: str, slot: Slot) -> bool:
+		message = _(
+			# Translators: Confirmation before replacing a personal entry. {word} is the entry word and {type} is its localized type.
+			'You already have a personal entry for "{word}" ({type}). Replace it?',
+		).format(word=word, type=self._slot_labels[slot])
+		return (
+			wx.MessageBox(
+				message,
+				# Translators: Title of the personal-entry replacement confirmation.
+				_("Dictionary Entry"),
+				wx.YES_NO | wx.NO_DEFAULT,
+				self,
+			)
+			== wx.YES
+		)
+
+	def _onAdd(self, _event: wx.CommandEvent) -> None:
+		language = self._current_language()
+		# Translators: Title of the dialog for adding a personal dictionary entry.
+		dialog = EntryDialog(self, _("Add Dictionary Entry"), language)
+		result = dialog.ShowModal()
+		entry = dialog.entry
+		slot = dialog.slot
+		dialog.Destroy()
+		if result != wx.ID_OK or entry is None:
+			self._entry_list.SetFocus()
+			return
+		if self._overlay.get_entry(language, slot, entry.key) is not None:
+			if not self._confirmReplace(entry.key, slot):
+				self._entry_list.SetFocus()
+				return
+			self._overlay.remove_entry(language, slot, entry.key)
+		self._overlay.set_entry(language, slot, entry)
+		self._refreshAfterMutation((entry.key, slot))
+
+	def _onEdit(self, _event: wx.CommandEvent) -> None:
+		row = self._selected_row()
+		if row is None:
+			return
+		language = self._current_language()
+		customizing = row.kind is RowKind.MANAGED
+		if customizing:
+			# Translators: Title of the dialog for creating a personal copy of a managed entry.
+			title = _("Customize Dictionary Entry")
+		else:
+			# Translators: Title of the dialog for editing a personal dictionary entry.
+			title = _("Edit Dictionary Entry")
+		dialog = EntryDialog(
+			self,
+			title,
+			language,
+			slot=row.slot,
+			entry=Entry(row.word, row.pronunciation),
+			lock_type=True,
+			lock_word=customizing,
+		)
+		result = dialog.ShowModal()
+		entry = dialog.entry
+		slot = dialog.slot
+		dialog.Destroy()
+		if result != wx.ID_OK or entry is None:
+			self._entry_list.SetFocus()
+			return
+		old_identity = (row.slot, key_identity(row.word, row.slot))
+		new_identity = (slot, key_identity(entry.key, slot))
+		collision = self._overlay.get_entry(language, slot, entry.key)
+		if new_identity != old_identity and collision is not None:
+			if not self._confirmReplace(entry.key, slot):
+				self._entry_list.SetFocus()
+				return
+		self._overlay.remove_entry(language, row.slot, row.word)
+		self._overlay.set_entry(language, slot, entry)
+		self._refreshAfterMutation((entry.key, slot))
+
+	def _onRemove(self, _event: wx.CommandEvent) -> None:
+		selection = cast(int, self._entry_list.GetFirstSelected())
+		row = self._selected_row()
+		if row is None or row.kind not in (RowKind.PERSONAL, RowKind.OVERRIDE):
+			return
+		self._overlay.remove_entry(self._current_language(), row.slot, row.word)
+		self._refreshAfterMutation((row.word, row.slot), selection)
+
+	def _onRemoveAll(self, _event: wx.CommandEvent) -> None:
+		language = self._current_language()
+		language_name = _language_display_names()[language]
+		count = self._overlay.count_for(language)
+		if count == 0:
+			wx.MessageBox(
+				# Translators: Message shown when the current language has no personal entries. {language} is the localized language name.
+				_("You have no personal entries for {language}.").format(language=language_name),
+				# Translators: Title of a message in the dictionary entry editor.
+				_("Eloquence Dictionary Entries"),
+				wx.OK,
+				self,
+			)
+			self._entry_list.SetFocus()
+			return
+		message = ngettext(
+			# Translators: Confirmation for removing one personal entry. {language} is the localized language name.
+			"Remove your personal entry for {language}? Managed entries are not affected.",
+			# Translators: Confirmation for removing multiple personal entries. {count} is the entry count and {language} is the localized language name.
+			"Remove all {count} of your personal entries for {language}? Managed entries are not affected.",
+			count,
+		).format(count=count, language=language_name)
+		if (
+			wx.MessageBox(
+				message,
+				# Translators: Title of the remove-all-personal-entries confirmation.
+				_("Eloquence Dictionary Entries"),
+				wx.YES_NO | wx.NO_DEFAULT,
+				self,
+			)
+			!= wx.YES
+		):
+			self._entry_list.SetFocus()
+			return
+		selection = cast(int, self._entry_list.GetFirstSelected())
+		selected_row = self._selected_row()
+		focus_target = (selected_row.word, selected_row.slot) if selected_row is not None else None
+		_removed = self._overlay.remove_language(language)
+		self._refreshAfterMutation(focus_target, selection)
 
 	@override
 	def postInit(self) -> None:
@@ -294,6 +624,15 @@ class EloquenceDictionariesDialog(SettingsDialog):
 
 	@override
 	def onOk(self, evt: wx.CommandEvent) -> None:
-		# This read-only slice intentionally performs no Personal Dictionary Overlay write;
-		# validation and commit arrive with ticket #19.
+		try:
+			save_personal_overlay(self._overlay, self._overlay_directory)
+		except (EntryValidationError, DictionaryEncodingError, OSError) as error:
+			wx.MessageBox(
+				str(error),
+				# Translators: Title of an error shown when personal dictionary entries cannot be saved.
+				_("Eloquence Dictionary Entries"),
+				wx.OK | wx.ICON_ERROR,
+				self,
+			)
+			return
 		super().onOk(evt)
