@@ -111,7 +111,6 @@ class EntryDialog(wx.Dialog):
 	):
 		super().__init__(parent, title=title)
 		self._language = language
-		self._current_pronunciation = entry.value if entry is not None else None
 		self.entry: Entry | None = None
 		self.slot = slot
 		initial_entry = entry or Entry("", "")
@@ -170,10 +169,9 @@ class EntryDialog(wx.Dialog):
 		preview_button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
 		self._play_current_button = preview_button_helper.addButton(
 			parent=self,
-			# Translators: Button for previewing the pronunciation from when the entry dialog opened.
+			# Translators: Button for previewing how Eloquence currently speaks the word.
 			label=_("Play &current"),
 		)
-		self._play_current_button.Enable(entry is not None)
 		self._play_current_button.Bind(wx.EVT_BUTTON, self._onPlayCurrent)
 		self._play_new_button = preview_button_helper.addButton(
 			parent=self,
@@ -218,8 +216,7 @@ class EntryDialog(wx.Dialog):
 		)
 
 	def _onPlayCurrent(self, _event: wx.CommandEvent) -> None:
-		if self._current_pronunciation is not None:
-			self._preview(self._current_pronunciation)
+		self._preview(self._word_control.GetValue())
 
 	def _onPlayNew(self, _event: wx.CommandEvent) -> None:
 		self._preview(self._pronunciation_control.GetValue())
