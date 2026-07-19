@@ -1240,8 +1240,11 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			return
 		if not rows:
 			wx.MessageBox(
-				# Translators: Message shown when every readable old dictionary entry is already in the personal overlay.
-				_("All readable entries are already identical to your personal entries."),
+				# Translators: Message shown when old dictionary files contain no likely hand edits to review.
+				_(
+					"No entries to import were found. "
+					"All readable entries are known upstream content or already match your personal entries.",
+				),
 				# Translators: Title of migration information shown when there is nothing new to review.
 				_("Import from Old Eloquence Dictionary Files"),
 				wx.OK | wx.ICON_INFORMATION,
