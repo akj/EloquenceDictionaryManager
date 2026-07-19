@@ -15,6 +15,9 @@ from gui.nvdaControls import AutoWidthColumnListCtrl
 from gui.settingsDialogs import SettingsDialog
 from logHandler import log
 import NVDAState
+import speech
+import synthDriverHandler
+import ui
 import wx
 
 from .ecidic.effective import EffectiveRow, EffectiveView, RowKind, ShowFilter
@@ -22,6 +25,7 @@ from .ecidic.languages import LANGUAGES
 from .ecidic.model import Entry, Slot
 from .ecidic.overlay import load_personal_overlay, save_personal_overlay
 from .ecidic.parsing import DictionaryEncodingError, key_identity
+from .ecidic.preview import is_eloquence_active
 from .ecidic.sets import ManagedSet, discover_managed_sets
 from .ecidic.validation import EntryValidationError, Field, normalize_entry, validate_entry
 
@@ -107,6 +111,7 @@ class EntryDialog(wx.Dialog):
 	):
 		super().__init__(parent, title=title)
 		self._language = language
+		self._current_pronunciation = entry.value if entry is not None else None
 		self.entry: Entry | None = None
 		self.slot = slot
 		initial_entry = entry or Entry("", "")
@@ -162,6 +167,22 @@ class EntryDialog(wx.Dialog):
 		)
 		sizer_helper.addItem(self._rules_control, flag=wx.EXPAND)
 
+		preview_button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
+		self._play_current_button = preview_button_helper.addButton(
+			parent=self,
+			# Translators: Button for previewing the pronunciation from when the entry dialog opened.
+			label=_("Play &current"),
+		)
+		self._play_current_button.Enable(entry is not None)
+		self._play_current_button.Bind(wx.EVT_BUTTON, self._onPlayCurrent)
+		self._play_new_button = preview_button_helper.addButton(
+			parent=self,
+			# Translators: Button for previewing the pronunciation currently entered in the dialog.
+			label=_("Play &new"),
+		)
+		self._play_new_button.Bind(wx.EVT_BUTTON, self._onPlayNew)
+		sizer_helper.addItem(preview_button_helper)
+
 		outer_sizer.Add(
 			sizer_helper.sizer,
 			proportion=1,
@@ -184,6 +205,24 @@ class EntryDialog(wx.Dialog):
 
 	def _onTypeChanged(self, _event: wx.CommandEvent) -> None:
 		self._rules_control.SetValue(_entry_rules()[self._selectedSlot()])
+
+	def _preview(self, pronunciation: str) -> None:
+		speech.cancelSpeech()
+		synth = synthDriverHandler.getSynth()
+		if synth is not None and is_eloquence_active(synth.name):
+			synth.speak([pronunciation])
+			return
+		ui.message(
+			# Translators: Message announced when a pronunciation preview cannot use Eloquence.
+			_("Preview unavailable: Eloquence is not the active synthesizer."),
+		)
+
+	def _onPlayCurrent(self, _event: wx.CommandEvent) -> None:
+		if self._current_pronunciation is not None:
+			self._preview(self._current_pronunciation)
+
+	def _onPlayNew(self, _event: wx.CommandEvent) -> None:
+		self._preview(self._pronunciation_control.GetValue())
 
 	def onOk(self, _event: wx.CommandEvent) -> None:
 		entry = Entry(
