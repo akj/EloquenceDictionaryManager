@@ -78,8 +78,8 @@ def _mechanical_issues(entry: Entry) -> list[ValidationIssue]:
 		# Translators: Validation error when the dictionary word field is empty.
 		issues.append(_issue(ValidationCode.EMPTY_KEY, Field.KEY, _("A word is required.")))
 	if not entry.value:
-		# Translators: Validation error when the pronunciation field is empty.
 		issues.append(
+			# Translators: Validation error when the pronunciation field is empty.
 			_issue(ValidationCode.EMPTY_VALUE, Field.VALUE, _("A pronunciation is required.")),
 		)
 	for field, text in ((Field.KEY, entry.key), (Field.VALUE, entry.value)):
@@ -155,14 +155,14 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 		return issues
 	if slot is Slot.MAIN:
 		if any(character.isspace() for character in entry.key):
-			# Translators: Exact-word validation error; entries match one token at a time.
 			message = _(
+				# Translators: Exact-word validation error; entries match one token at a time.
 				"The word cannot contain spaces. Dictionary entries match one word at a time.",
 			)
 			issues.append(_issue(ValidationCode.MAIN_KEY_WHITESPACE, Field.KEY, message))
 		if _is_punctuation(entry.key[-1]):
-			# Translators: Exact-word validation error. The first placeholder is the word and the second is its final punctuation character.
 			message = _(
+				# Translators: Exact-word validation error. The first placeholder is the word and the second is its final punctuation character.
 				'The word cannot end with punctuation ("{word}" ends with "{character}").',
 			).format(word=entry.key, character=entry.key[-1])
 			issues.append(
@@ -170,29 +170,29 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 			)
 	elif slot is Slot.ROOT:
 		if not entry.key.isalpha():
-			# Translators: Word-root validation error. {word} is the invalid word root.
 			message = _(
+				# Translators: Word-root validation error. {word} is the invalid word root.
 				'Word roots can contain only letters. "{word}" cannot be a word root — for words with digits or symbols, use an Exact word entry.',
 			).format(word=entry.key)
 			issues.append(_issue(ValidationCode.ROOT_KEY_NOT_LETTERS, Field.KEY, message))
 		if not (entry.value.isalpha() or _is_bare_spr(entry.value)):
-			# Translators: Word-root validation error describing the two permitted pronunciation forms.
 			message = _(
+				# Translators: Word-root validation error describing the two permitted pronunciation forms.
 				"A word root pronunciation must be a single word or one phonetic string (`[...]) — no spaces, digits, or emphasis codes.",
 			)
 			issues.append(_issue(ValidationCode.ROOT_VALUE_INVALID, Field.VALUE, message))
 	else:
 		if not _valid_abbreviation_key(entry.key):
-			# Translators: Abbreviation validation error with examples of permitted keys.
 			message = _(
+				# Translators: Abbreviation validation error with examples of permitted keys.
 				'An abbreviation can contain only letters and periods, with apostrophes inside the word — for example "Dr." or "e.g.".',
 			)
 			issues.append(
 				_issue(ValidationCode.ABBREVIATION_KEY_INVALID, Field.KEY, message),
 			)
 		if not _valid_abbreviation_value(entry.value):
-			# Translators: Abbreviation validation error describing permitted expansion text.
 			message = _(
+				# Translators: Abbreviation validation error describing permitted expansion text.
 				"An abbreviation expansion must be plain words separated by spaces or hyphens — no digits, punctuation, or phonetic symbols.",
 			)
 			issues.append(
@@ -218,8 +218,8 @@ def _encoding_issues(entry: Entry, language: Language) -> list[ValidationIssue]:
 	for field, text in ((Field.KEY, entry.key), (Field.VALUE, entry.value)):
 		character = find_unencodable_character(text, language)
 		if character is not None:
-			# Translators: Encoding validation error. {character} is the unsupported character.
 			message = _(
+				# Translators: Encoding validation error. {character} is the unsupported character.
 				'The character "{character}" cannot be saved in an Eloquence dictionary (Western encoding only).',
 			).format(character=character)
 			issues.append(_issue(ValidationCode.UNENCODABLE_CHARACTER, field, message))
@@ -236,8 +236,8 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 		end = value.find("]", start + 2)
 		nested = value.find("`[", start + 2)
 		if end < 0 or (nested >= 0 and nested < end):
-			# Translators: SPR validation error when a phonetic string has no matching closing bracket.
 			message = _(
+				# Translators: SPR validation error when a phonetic string has no matching closing bracket.
 				'The phonetic string is not closed — expected "]" after "`[".',
 			)
 			issues.append(_issue(ValidationCode.SPR_UNCLOSED, Field.VALUE, message))
@@ -251,14 +251,14 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 		if len(quote_parts) % 2 == 0 or any(
 			len(quote_parts[index]) != 2 for index in range(1, len(quote_parts), 2)
 		):
-			# Translators: SPR validation error for malformed quoting around a two-character phoneme symbol.
 			message = _(
+				# Translators: SPR validation error for malformed quoting around a two-character phoneme symbol.
 				"A quoted phonetic symbol must contain exactly two characters between matching apostrophes.",
 			)
 			issues.append(_issue(ValidationCode.SPR_QUOTE_INVALID, Field.VALUE, message))
 		if body.count(".") + 1 > 1 and "1" not in body:
-			# Translators: SPR validation error when a multi-syllable phonetic string has no primary stress marker.
 			message = _(
+				# Translators: SPR validation error when a multi-syllable phonetic string has no primary stress marker.
 				'A phonetic string with more than one syllable needs a primary stress marker "1", for example `[.1kwi.0nwa].',
 			)
 			issues.append(
