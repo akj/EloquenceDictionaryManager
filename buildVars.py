@@ -21,13 +21,15 @@ addon_info = AddonInfo(
 	# Add-on description
 	addon_description=_(
 		# Translators: Long description shown for this add-on in the add-on store.
-		"Provides community Eloquence pronunciation dictionaries and tools for managing personal entries.",
+		"Eloquence Dictionary Manager bundles the community IBMTTSDictionaries Eloquence pronunciation dictionary set curated by eigencrow, ready to use as soon as the add-on is installed. Its editor lets you add and customize your own pronunciations with spoken previews, export and import .edm-dict files to share or back up personal entries, and recover your hand edits from Eloquence dictionary files used before this add-on. The add-on software is licensed under the GNU General Public License, version 2 or later. The bundled dictionary data is licensed separately under CC0-1.0, a public domain dedication. The migration feature uses only content hashes derived from the history of mohamed00's AltIBMTTSDictionaries; that set's dictionary content is not bundled.",
 	),
 	# version
 	addon_version="0.1.0",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
-	addon_changelog=_("Initial development scaffold."),
+	addon_changelog=_(
+		"Adds the bundled IBMTTSDictionaries set, personal-entry editing and sharing, and migration of hand edits from old Eloquence dictionary files.",
+	),
 	# Author(s)
 	addon_author="Andrew <andrew@johnson5.net>",
 	# URL for the add-on documentation support
@@ -67,7 +69,7 @@ i18nSources: list[str] = pythonSources + ["buildVars.py"]
 # Paths are relative to the addon directory, not to the root directory of your addon sources.
 # You can either list every file (using ""/") as a path separator,
 # or use glob expressions.
-excludedFiles: list[str] = []
+excludedFiles: list[str] = ["**/__pycache__/*", "**/*.py[co]"]
 
 # Base language for the NVDA add-on
 # If your add-on is written in a language other than english, modify this variable.
