@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from .languages import Language, get_language
 from .model import Entry, Slot, coerce_slot
@@ -104,11 +104,19 @@ def parse_dictionary_bytes(
 	data: bytes,
 	language: Language | str,
 	slot: Slot | str,
+	*,
+	allow_invalid_entries: bool = False,
 ) -> tuple[Entry, ...]:
-	"""Decode and parse LF, CRLF, or mixed-line-ending dictionary bytes."""
+	"""Decode and parse LF, CRLF, or mixed-line-ending dictionary bytes.
+
+	When ``allow_invalid_entries`` is true, a line with additional tabs is kept
+	as one entry whose value contains those tabs. This lets the read-only Managed
+	Dictionary Set view surface vendored lines that fail editor validation while
+	still rejecting lines with no key/value separator.
+	"""
 
 	language_record = get_language(language) if isinstance(language, str) else language
-	coerce_slot(slot)
+	coerce_slot(slot)  # pyright: ignore[reportUnusedCallResult]
 	try:
 		text = data.decode(language_record.encoding, errors="strict")
 	except UnicodeDecodeError as error:
@@ -126,20 +134,21 @@ def parse_dictionary_bytes(
 		return ()
 	lines = text.split("\n")
 	if lines[-1] == "":
-		lines.pop()
+		del lines[-1]
 	entries: list[Entry] = []
 	for line_number, line in enumerate(lines, start=1):
 		if not line:
 			# Translators: Import error for a blank dictionary line. {line} is the one-based line number.
 			message = _("Dictionary line {line} is blank.").format(line=line_number)
 			raise DictionaryFormatError(message)
-		if line.count("\t") != 1:
+		tab_count = line.count("\t")
+		if tab_count != 1 and not (allow_invalid_entries and tab_count > 1):
 			# Translators: Import error when a line does not contain exactly one tab separator. {line} is the one-based line number.
 			message = _(
 				"Dictionary line {line} must contain exactly one tab between the word and pronunciation.",
 			).format(line=line_number)
 			raise DictionaryFormatError(message)
-		key, value = line.split("\t")
+		key, value = line.split("\t", maxsplit=1)
 		entries.append(Entry(key=key, value=value))
 	return tuple(entries)
 
@@ -211,12 +220,21 @@ def serialize_dictionary_bytes(
 		raise DictionaryEncodingError(message) from error
 
 
-def load_dictionary_file(path: str | Path) -> tuple[Entry, ...]:
+def load_dictionary_file(
+	path: str | Path,
+	*,
+	allow_invalid_entries: bool = False,
+) -> tuple[Entry, ...]:
 	"""Infer language and slot from *path*, then parse its bytes."""
 
 	path_value = Path(path)
 	filename = parse_dictionary_filename(path_value)
-	return parse_dictionary_bytes(path_value.read_bytes(), filename.language, filename.slot)
+	return parse_dictionary_bytes(
+		path_value.read_bytes(),
+		filename.language,
+		filename.slot,
+		allow_invalid_entries=allow_invalid_entries,
+	)
 
 
 def write_dictionary_file(
@@ -228,5 +246,5 @@ def write_dictionary_file(
 	"""Write a canonical lowercase filename and return its path."""
 
 	path = Path(directory) / canonical_filename(language, slot)
-	path.write_bytes(serialize_dictionary_bytes(entries, language, slot))
+	_ = path.write_bytes(serialize_dictionary_bytes(entries, language, slot))
 	return path

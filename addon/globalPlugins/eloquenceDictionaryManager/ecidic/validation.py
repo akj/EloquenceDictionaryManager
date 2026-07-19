@@ -172,23 +172,20 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 		if not entry.key.isalpha():
 			# Translators: Word-root validation error. {word} is the invalid word root.
 			message = _(
-				'Word roots can contain only letters. "{word}" cannot be a word root — '
-				"for words with digits or symbols, use an Exact word entry.",
+				'Word roots can contain only letters. "{word}" cannot be a word root — for words with digits or symbols, use an Exact word entry.',
 			).format(word=entry.key)
 			issues.append(_issue(ValidationCode.ROOT_KEY_NOT_LETTERS, Field.KEY, message))
 		if not (entry.value.isalpha() or _is_bare_spr(entry.value)):
 			# Translators: Word-root validation error describing the two permitted pronunciation forms.
 			message = _(
-				"A word root pronunciation must be a single word or one phonetic string "
-				"(`[...]) — no spaces, digits, or emphasis codes.",
+				"A word root pronunciation must be a single word or one phonetic string (`[...]) — no spaces, digits, or emphasis codes.",
 			)
 			issues.append(_issue(ValidationCode.ROOT_VALUE_INVALID, Field.VALUE, message))
 	else:
 		if not _valid_abbreviation_key(entry.key):
 			# Translators: Abbreviation validation error with examples of permitted keys.
 			message = _(
-				"An abbreviation can contain only letters and periods, with apostrophes "
-				'inside the word — for example "Dr." or "e.g.".',
+				'An abbreviation can contain only letters and periods, with apostrophes inside the word — for example "Dr." or "e.g.".',
 			)
 			issues.append(
 				_issue(ValidationCode.ABBREVIATION_KEY_INVALID, Field.KEY, message),
@@ -196,8 +193,7 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 		if not _valid_abbreviation_value(entry.value):
 			# Translators: Abbreviation validation error describing permitted expansion text.
 			message = _(
-				"An abbreviation expansion must be plain words separated by spaces or "
-				"hyphens — no digits, punctuation, or phonetic symbols.",
+				"An abbreviation expansion must be plain words separated by spaces or hyphens — no digits, punctuation, or phonetic symbols.",
 			)
 			issues.append(
 				_issue(ValidationCode.ABBREVIATION_VALUE_INVALID, Field.VALUE, message),
@@ -211,7 +207,7 @@ def find_unencodable_character(text: str, language: Language | str) -> str | Non
 	language_record = get_language(language) if isinstance(language, str) else language
 	for character in text:
 		try:
-			character.encode(language_record.encoding, errors="strict")
+			_encoded = character.encode(language_record.encoding, errors="strict")
 		except UnicodeEncodeError:
 			return character
 	return None
@@ -224,8 +220,7 @@ def _encoding_issues(entry: Entry, language: Language) -> list[ValidationIssue]:
 		if character is not None:
 			# Translators: Encoding validation error. {character} is the unsupported character.
 			message = _(
-				'The character "{character}" cannot be saved in an Eloquence dictionary '
-				"(Western encoding only).",
+				'The character "{character}" cannot be saved in an Eloquence dictionary (Western encoding only).',
 			).format(character=character)
 			issues.append(_issue(ValidationCode.UNENCODABLE_CHARACTER, field, message))
 	return issues
@@ -264,8 +259,7 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 		if body.count(".") + 1 > 1 and "1" not in body:
 			# Translators: SPR validation error when a multi-syllable phonetic string has no primary stress marker.
 			message = _(
-				"A phonetic string with more than one syllable needs a primary stress "
-				'marker "1", for example `[.1kwi.0nwa].',
+				'A phonetic string with more than one syllable needs a primary stress marker "1", for example `[.1kwi.0nwa].',
 			)
 			issues.append(
 				_issue(ValidationCode.SPR_PRIMARY_STRESS_REQUIRED, Field.VALUE, message),

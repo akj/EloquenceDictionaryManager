@@ -143,7 +143,7 @@ def test_unencodable_characters_are_rejected_loudly(entry: Entry, field: Field) 
 
 def test_serializer_never_replaces_or_strips_unencodable_text_even_without_validation() -> None:
 	with pytest.raises(DictionaryEncodingError, match="漢"):
-		serialize_dictionary_bytes(
+		_ = serialize_dictionary_bytes(
 			[Entry("word", "漢")],
 			"enu",
 			Slot.MAIN,
