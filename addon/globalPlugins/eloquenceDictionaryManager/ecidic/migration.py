@@ -118,7 +118,7 @@ def _find_case_insensitive_directory(parent: Path, expected_name: str) -> tuple[
 				if child.is_dir() and child.name.casefold() == expected_name.casefold()
 			),
 			key=lambda path: (path.name.casefold(), path.name),
-		)
+		),
 	)
 
 
