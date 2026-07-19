@@ -9,4 +9,6 @@ from pathlib import Path
 PACKAGE_PARENT = (
 	Path(__file__).resolve().parents[1] / "addon" / "globalPlugins" / "eloquenceDictionaryManager"
 )
+TOOLS_DIRECTORY = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(PACKAGE_PARENT))
+sys.path.insert(0, str(TOOLS_DIRECTORY))
