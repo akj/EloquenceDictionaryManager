@@ -482,10 +482,11 @@ def verify_tree(repo_root: Path, lock: SourceLock) -> list[str]:
 	if not dictionaries_root.is_dir():
 		return ["addon/dictionaries is missing"]
 	expected_dictionary_entries = {"contract.ini", "sets"}
+	allowed_dictionary_entries = {*expected_dictionary_entries, "historicalUnion"}
 	actual_dictionary_entries = _directory_names(dictionaries_root)
 	for name in sorted(expected_dictionary_entries - actual_dictionary_entries):
 		problems.append(f"addon/dictionaries/{name} is missing")
-	for name in sorted(actual_dictionary_entries - expected_dictionary_entries):
+	for name in sorted(actual_dictionary_entries - allowed_dictionary_entries):
 		problems.append(f"addon/dictionaries/{name} is unexpected")
 	problems.extend(_verify_contract(dictionaries_root))
 
