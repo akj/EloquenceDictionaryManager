@@ -76,7 +76,6 @@ class MigrationCandidateStatus(str, Enum):
 	LIKELY_HAND_EDIT = "likelyHandEdit"
 	INVALID = "invalid"
 	DIFFERS_FROM_PERSONAL = "differsFromPersonal"
-	KNOWN_UPSTREAM = "knownUpstream"
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,9 +214,6 @@ def _status_text(status: MigrationCandidateStatus) -> str:
 	if status is MigrationCandidateStatus.DIFFERS_FROM_PERSONAL:
 		# Translators: Migration status for a legacy row that would replace a different personal entry.
 		return _("Differs from your current entry for this word")
-	if status is MigrationCandidateStatus.KNOWN_UPSTREAM:
-		# Translators: Migration status for a legacy row found in known upstream dictionary history.
-		return _("Matches known upstream content")
 	raise ValueError(f"Invalid migration status for a fixed label: {status}")
 
 
@@ -230,6 +226,13 @@ def classify_migration_candidates(
 
 	rows: list[MigrationCandidateRow] = []
 	for candidate in candidates:
+		if historical_union.contains(
+			candidate.language,
+			candidate.slot,
+			candidate.entry.key,
+			candidate.entry.value,
+		):
+			continue
 		existing = overlay.get_entry(candidate.language, candidate.slot, candidate.entry.key)
 		# Root identity is case-insensitive and personal root keys are normalized on
 		# write, so an equal value is already the same effective personal entry.
@@ -243,16 +246,6 @@ def classify_migration_candidates(
 			checkable = False
 		elif existing is not None:
 			status = MigrationCandidateStatus.DIFFERS_FROM_PERSONAL
-			status_text = _status_text(status)
-			checked_by_default = False
-			checkable = True
-		elif historical_union.contains(
-			candidate.language,
-			candidate.slot,
-			candidate.entry.key,
-			candidate.entry.value,
-		):
-			status = MigrationCandidateStatus.KNOWN_UPSTREAM
 			status_text = _status_text(status)
 			checked_by_default = False
 			checkable = True
@@ -274,9 +267,6 @@ def classify_migration_candidates(
 				path=candidate.path,
 			),
 		)
-	# Known-upstream rows remain visible, but unchecked. This exposes what was
-	# scanned and permits an explicit recovery choice while ensuring the default
-	# import contains only likely hand edits.
 	return tuple(rows)
 
 

@@ -176,7 +176,7 @@ def test_auto_scan_does_not_fall_through_a_decodable_empty_dictionary(tmp_path: 
 	assert discovery.scan.candidates == ()
 
 
-def test_classification_covers_all_statuses_and_omits_identical_personal_entries() -> None:
+def test_classification_covers_remaining_statuses_and_omits_personal_and_upstream_entries() -> None:
 	candidates = (
 		_candidate("hand", "custom"),
 		_candidate("two words", "invalid"),
@@ -194,24 +194,51 @@ def test_classification_covers_all_statuses_and_omits_identical_personal_entries
 
 	rows = classify_migration_candidates(candidates, overlay, historical)
 
-	assert [row.word for row in rows] == ["hand", "two words", "collision", "upstream"]
+	assert [row.word for row in rows] == ["hand", "two words", "collision"]
 	assert [row.status for row in rows] == [
 		MigrationCandidateStatus.LIKELY_HAND_EDIT,
 		MigrationCandidateStatus.INVALID,
 		MigrationCandidateStatus.DIFFERS_FROM_PERSONAL,
-		MigrationCandidateStatus.KNOWN_UPSTREAM,
 	]
 	assert [(row.checked_by_default, row.checkable) for row in rows] == [
 		(True, True),
 		(False, False),
-		(False, True),
 		(False, True),
 	]
 	assert (
 		rows[1].status_text == "The word cannot contain spaces. Dictionary entries match one word at a time."
 	)
 	assert rows[2].status_text == "Differs from your current entry for this word"
-	assert rows[3].status_text == "Matches known upstream content"
+
+
+def test_historical_union_match_is_omitted_from_candidate_rows() -> None:
+	candidate = _candidate("upstream", "known")
+	historical = _HistoricalUnionStub({("enu", Slot.MAIN, "upstream", "known")})
+
+	rows = classify_migration_candidates((candidate,), PersonalOverlay(), historical)
+
+	assert rows == ()
+
+
+def test_historical_union_match_wins_over_personal_collision() -> None:
+	candidate = _candidate("upstream", "known")
+	overlay = PersonalOverlay.from_entries(
+		[("enu", Slot.MAIN, Entry("upstream", "personal"))],
+	)
+	historical = _HistoricalUnionStub({("enu", Slot.MAIN, "upstream", "known")})
+
+	rows = classify_migration_candidates((candidate,), overlay, historical)
+
+	assert rows == ()
+
+
+def test_invalid_historical_union_match_is_omitted() -> None:
+	candidate = _candidate("two words", "known")
+	historical = _HistoricalUnionStub({("enu", Slot.MAIN, "two words", "known")})
+
+	rows = classify_migration_candidates((candidate,), PersonalOverlay(), historical)
+
+	assert rows == ()
 
 
 def test_root_identical_detection_uses_identity_without_normalizing_candidate_display() -> None:
@@ -255,5 +282,5 @@ def test_reclassification_after_import_has_no_new_default_checked_rows() -> None
 	assert apply_migration_candidates(overlay, selected) == 1
 	second_rows = classify_migration_candidates(candidates, overlay, historical)
 
-	assert [row.word for row in second_rows] == ["upstream"]
+	assert second_rows == ()
 	assert not any(row.checked_by_default for row in second_rows)
