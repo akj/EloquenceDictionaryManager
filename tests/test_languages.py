@@ -23,4 +23,4 @@ def test_language_lookup_is_case_insensitive_and_returns_per_language_encoding()
 @pytest.mark.parametrize("code", ["chs", "jpn", "kor", "zzz"])
 def test_non_western_or_unknown_voice_codes_are_rejected(code: str) -> None:
 	with pytest.raises(UnsupportedLanguageError, match=code):
-		get_language(code)
+		_ = get_language(code)

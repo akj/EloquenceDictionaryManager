@@ -1,11 +1,12 @@
 """Global plugin entry point for Eloquence Dictionary Manager."""
 
+from typing import cast, override
+
 import addonHandler
 import globalPluginHandler
 import globalVars
 import gui
-from gui import blockAction, guiHelper
-from gui.dpiScalingHelper import DpiScalingHelperMixinWithoutInit
+from gui import blockAction
 import inputCore
 from scriptHandler import script
 import wx
@@ -26,61 +27,13 @@ def _normalizeMenuLabel(label: str) -> str:
 def _findSpeechDictionariesInsertionPosition(menu: wx.Menu) -> int | None:
 	"""Return the position immediately after NVDA's speech dictionaries submenu."""
 	expectedLabel = _normalizeMenuLabel(_SPEECH_DICTIONARIES_MENU_LABEL)
-	for position, item in enumerate(menu.GetMenuItems()):
-		if item.GetSubMenu() is None:
+	items = cast(list[wx.MenuItem], menu.GetMenuItems())  # pyright: ignore[reportUnknownMemberType]
+	for position, item in enumerate(items):
+		if cast(wx.Menu | None, item.GetSubMenu()) is None:
 			continue
 		if _normalizeMenuLabel(item.GetItemLabelText()) == expectedLabel:
 			return position + 1
 	return None
-
-
-class EloquenceDictionariesDialog(
-	DpiScalingHelperMixinWithoutInit,
-	wx.Dialog,
-):
-	"""Placeholder for the standalone Eloquence dictionary editor."""
-
-	def __init__(self, parent: wx.Window):
-		super().__init__(
-			parent,
-			# Translators: Title of the Eloquence dictionary editor dialog.
-			title=_("Eloquence Dictionaries"),
-			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX,
-		)
-
-		mainSizer = wx.BoxSizer(wx.VERTICAL)
-		sizerHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-		sizerHelper.addItem(
-			wx.StaticText(
-				self,
-				# Translators: Placeholder text in the Eloquence dictionary editor dialog.
-				label=_("This is a placeholder for the Eloquence dictionary editor."),
-			),
-		)
-		closeButton = wx.Button(
-			self,
-			wx.ID_CLOSE,
-			# Translators: Label of the button that closes the Eloquence dictionary editor dialog.
-			label=_("&Close"),
-		)
-		closeButton.Bind(wx.EVT_BUTTON, self._onClose)
-		sizerHelper.addDialogDismissButtons(closeButton, separated=True)
-
-		mainSizer.Add(
-			sizerHelper.sizer,
-			proportion=1,
-			flag=wx.EXPAND | wx.ALL,
-			border=guiHelper.BORDER_FOR_DIALOGS,
-		)
-		self.SetSizer(mainSizer)
-		mainSizer.Fit(self)
-		self.SetMinSize(self.scaleSize((420, 180)))
-		self.SetSize(self.scaleSize((560, 320)))
-		self.CentreOnParent()
-		closeButton.SetFocus()
-
-	def _onClose(self, _event: wx.CommandEvent) -> None:
-		self.EndModal(wx.ID_CLOSE)
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -94,7 +47,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if globalVars.appArgs.secure:
 			return
 
-		self._preferencesMenu = gui.mainFrame.sysTrayIcon.preferencesMenu
+		mainFrame = gui.mainFrame
+		if mainFrame is None:
+			return
+		self._preferencesMenu = mainFrame.sysTrayIcon.preferencesMenu
 		self._menuItem = wx.MenuItem(
 			self._preferencesMenu,
 			wx.ID_ANY,
@@ -102,18 +58,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			_("Eloquence &dictionaries..."),
 		)
 		insertionPosition = _findSpeechDictionariesInsertionPosition(self._preferencesMenu)
+		# Assigning to "_" would shadow the module's gettext lookup, so use a throwaway name.
 		if insertionPosition is None:
-			self._preferencesMenu.Append(self._menuItem)
+			_insertedItem = self._preferencesMenu.Append(self._menuItem)
 		else:
-			self._preferencesMenu.Insert(insertionPosition, self._menuItem)
-		gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, self._openDialog, self._menuItem)
+			_insertedItem = self._preferencesMenu.Insert(insertionPosition, self._menuItem)
+		mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, self._openDialog, self._menuItem)  # pyright: ignore[reportUnknownMemberType]
 
+	@override
 	def terminate(self) -> None:
 		super().terminate()
 		if self._preferencesMenu is None or self._menuItem is None:
 			return
 		try:
-			self._preferencesMenu.Remove(self._menuItem)
+			_removedItem = self._preferencesMenu.Remove(self._menuItem)
 		except (RuntimeError, AttributeError):
 			# The menu may already have been destroyed while NVDA is shutting down.
 			pass
@@ -122,15 +80,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@blockAction.when(blockAction.Context.SECURE_MODE)
 	def _openDialog(self, _event: wx.CommandEvent | None = None) -> None:
-		gui.mainFrame.prePopup()
-		dialog: EloquenceDictionariesDialog | None = None
-		try:
-			dialog = EloquenceDictionariesDialog(gui.mainFrame)
-			dialog.ShowModal()
-		finally:
-			if dialog is not None:
-				dialog.Destroy()
-			gui.mainFrame.postPopup()
+		from .editor import EloquenceDictionariesDialog
+
+		mainFrame = gui.mainFrame
+		if mainFrame is None:
+			return
+		mainFrame.popupSettingsDialog(EloquenceDictionariesDialog)  # pyright: ignore[reportUnknownMemberType]
 
 	@script(
 		# Translators: Description of the command that opens the Eloquence dictionary editor.

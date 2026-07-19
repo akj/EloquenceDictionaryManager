@@ -46,27 +46,27 @@ def test_dictionary_filename_parser_tolerates_observed_case_conventions(
 
 def test_invalid_or_unsupported_filename_is_rejected() -> None:
 	with pytest.raises(DictionaryFilenameError):
-		parse_dictionary_filename("enuwords.dic")
+		_ = parse_dictionary_filename("enuwords.dic")
 	with pytest.raises(DictionaryFilenameError):
-		parse_dictionary_filename("chsmain.dic")
+		_ = parse_dictionary_filename("chsmain.dic")
 
 
 def test_case_insensitive_discovery_works_on_case_sensitive_filesystems(tmp_path: Path) -> None:
 	path = tmp_path / "ENURoot.dic"
-	path.write_bytes(b"figure\tfigyer\r\n")
+	_ = path.write_bytes(b"figure\tfigyer\r\n")
 
 	assert find_dictionary_file(tmp_path, "enu", Slot.ROOT) == path
 	assert load_dictionary_file(path) == (Entry("figure", "figyer"),)
 
 
 def test_case_insensitive_discovery_rejects_ambiguous_copies(tmp_path: Path) -> None:
-	(tmp_path / "enumain.dic").write_bytes(b"one\tone\r\n")
-	(tmp_path / "ENUmain.dic").write_bytes(b"two\ttwo\r\n")
+	_ = (tmp_path / "enumain.dic").write_bytes(b"one\tone\r\n")
+	_ = (tmp_path / "ENUmain.dic").write_bytes(b"two\ttwo\r\n")
 	if len(list(tmp_path.iterdir())) < 2:
 		pytest.skip("The test filesystem is case-insensitive")
 
 	with pytest.raises(DictionaryFilenameError, match="More than one"):
-		find_dictionary_file(tmp_path, "enu", Slot.MAIN)
+		_ = find_dictionary_file(tmp_path, "enu", Slot.MAIN)
 
 
 @pytest.mark.parametrize(
@@ -143,12 +143,12 @@ def test_writer_uses_canonical_lowercase_filename_and_bytes(tmp_path: Path) -> N
 )
 def test_structurally_invalid_dictionary_lines_are_rejected(data: bytes, message: str) -> None:
 	with pytest.raises(DictionaryFormatError, match=message):
-		parse_dictionary_bytes(data, "enu", Slot.MAIN)
+		_ = parse_dictionary_bytes(data, "enu", Slot.MAIN)
 
 
 def test_invalid_bytes_for_language_code_page_are_rejected() -> None:
 	with pytest.raises(DictionaryEncodingError, match="invalid"):
-		parse_dictionary_bytes(b"word\t\x81\r\n", "enu", Slot.MAIN)
+		_ = parse_dictionary_bytes(b"word\t\x81\r\n", "enu", Slot.MAIN)
 
 
 def test_empty_file_round_trips() -> None:
