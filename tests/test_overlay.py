@@ -14,8 +14,8 @@ def test_missing_overlay_directory_is_empty(tmp_path: Path) -> None:
 
 
 def test_overlay_loads_languages_slots_and_case_insensitive_filenames(tmp_path: Path) -> None:
-	(tmp_path / "ENUMAIN.DIC").write_bytes(b"Word\tpronunciation\r\n")
-	(tmp_path / "deuRoot.Dic").write_bytes(b"Haus\thouse\n")
+	_ = (tmp_path / "ENUMAIN.DIC").write_bytes(b"Word\tpronunciation\r\n")
+	_ = (tmp_path / "deuRoot.Dic").write_bytes(b"Haus\thouse\n")
 
 	overlay, diagnostics = load_personal_overlay(tmp_path)
 
@@ -25,8 +25,8 @@ def test_overlay_loads_languages_slots_and_case_insensitive_filenames(tmp_path: 
 
 
 def test_corrupt_overlay_file_is_skipped_without_hiding_valid_files(tmp_path: Path) -> None:
-	(tmp_path / "enumain.dic").write_bytes(b"missing tab\n")
-	(tmp_path / "deumain.dic").write_bytes(b"Haus\thouse\n")
+	_ = (tmp_path / "enumain.dic").write_bytes(b"missing tab\n")
+	_ = (tmp_path / "deumain.dic").write_bytes(b"Haus\thouse\n")
 
 	overlay, diagnostics = load_personal_overlay(tmp_path)
 

@@ -1,9 +1,13 @@
 """Read-only effective-entry editor dialog for Eloquence dictionaries."""
 
+# The wx stubs leave many member types partially unknown, and wx GUI construction
+# discards returned sizer items pervasively, so relax those two rules file-wide.
+# pyright: reportUnknownMemberType=false, reportUnusedCallResult=false
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import override
+from typing import cast, override
 
 import addonHandler
 from gui import guiHelper
@@ -71,7 +75,7 @@ class EloquenceDictionariesDialog(SettingsDialog):
 	# Translators: Title of the Eloquence dictionary entries editor.
 	title = _("Eloquence Dictionary Entries")
 
-	def __init__(self, parent: wx.Window | None):
+	def __init__(self, parent: wx.Window):
 		managed_sets, discovery_diagnostics = discover_managed_sets(_available_provider_paths())
 		for diagnostic in discovery_diagnostics:
 			log.debugWarning(
@@ -99,11 +103,11 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		)
 		self._slot_labels = _slot_labels()
 		super().__init__(parent, resizeable=True)
-		self.SetSize(self.scaleSize((760, 560)))
+		self.SetSize(cast("wx.Size", self.scaleSize((760, 560))))
 		self.CentreOnScreen()
 
 	@override
-	def makeSettings(self, sizer: wx.Sizer) -> None:
+	def makeSettings(self, sizer: wx.BoxSizer) -> None:
 		sizer_helper = guiHelper.BoxSizerHelper(self, sizer=sizer)
 
 		top_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -173,7 +177,7 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
 			border=guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_HORIZONTAL,
 		)
-		self._filter_control = wx.TextCtrl(self, size=self.scaleSize((190, -1)))
+		self._filter_control = wx.TextCtrl(self, size=cast("wx.Size", self.scaleSize((190, -1))))
 		self._filter_control.Bind(wx.EVT_TEXT, self._onFilterChanged)
 		filter_row.Add(
 			self._filter_control,
@@ -225,13 +229,13 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_VIRTUAL,
 		)
 		# Translators: Column header for the dictionary entry key.
-		self._entry_list.AppendColumn(_("Word"), width=self.scaleSize(145))
+		self._entry_list.AppendColumn(_("Word"), width=cast(int, self.scaleSize(145)))
 		# Translators: Column header for the dictionary entry pronunciation.
-		self._entry_list.AppendColumn(_("Pronunciation"), width=self.scaleSize(180))
+		self._entry_list.AppendColumn(_("Pronunciation"), width=cast(int, self.scaleSize(180)))
 		# Translators: Column header for the ECI dictionary slot type.
-		self._entry_list.AppendColumn(_("Type"), width=self.scaleSize(110))
+		self._entry_list.AppendColumn(_("Type"), width=cast(int, self.scaleSize(110)))
 		# Translators: Column header for the dictionary entry provenance.
-		self._entry_list.AppendColumn(_("Source"), width=self.scaleSize(240))
+		self._entry_list.AppendColumn(_("Source"), width=cast(int, self.scaleSize(240)))
 		sizer_helper.addItem(self._entry_list, proportion=1, flag=wx.EXPAND)
 
 	def _defaultLanguage(self) -> str:
