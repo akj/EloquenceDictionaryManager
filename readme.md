@@ -126,9 +126,9 @@ to save them or **Cancel** to undo the complete import.
 Choose **Import from old Eloquence dictionary files...** to recover likely hand
 edits from dictionaries used before this add-on. The tool compares old entries
 with provenance hashes made from the known history of IBMTTSDictionaries and
-AltIBMTTSDictionaries. Known upstream content is left managed; likely hand edits
-can be added to your personal entries. The tool never modifies or deletes the
-old files.
+AltIBMTTSDictionaries. Known upstream content is skipped, so the review shows
+only entries that look like your own changes. The tool never modifies or
+deletes the old files.
 
 The tool first looks in the old Eloquence add-on's
 `synthDrivers/eloquence-dic-backup` folder and then its live

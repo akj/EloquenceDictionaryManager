@@ -33,7 +33,7 @@ included in the package.
 
 ## Store description
 
-> Eloquence Dictionary Manager includes the community Eloquence pronunciation dictionary set eigencrow IBMTTSDictionaries, ready to use out of the box. Its personal-entry editor lets you customize pronunciations, export and import .edm-dict files to share dictionaries between users and machines, and recover hand edits from old Eloquence dictionary files with a migration tool. IBMTTSDictionaries is curated by eigencrow and licensed under CC0-1.0. mohamed00 AltIBMTTSDictionaries informed only the provenance data for the historical-union migration feature; its dictionary content is not bundled because no redistribution license grant exists. The add-on software is licensed under GPL v2 or later. The bundled dictionary data is licensed separately under CC0-1.0, a public domain dedication.
+> Eloquence Dictionary Manager bundles the community IBMTTSDictionaries Eloquence pronunciation dictionary set curated by eigencrow, ready to use as soon as the add-on is installed. Its editor lets you add and customize your own pronunciations with spoken previews, export and import .edm-dict files to share or back up personal entries, and recover your hand edits from Eloquence dictionary files used before this add-on. The add-on software is licensed under the GNU General Public License, version 2 or later. The bundled dictionary data is licensed separately under CC0-1.0, a public domain dedication. The migration feature uses only content hashes derived from the history of mohamed00's AltIBMTTSDictionaries; that set's dictionary content is not bundled.
 
 The paragraph above is copied verbatim from the English source string for
 `addon_description` in `buildVars.py`.
