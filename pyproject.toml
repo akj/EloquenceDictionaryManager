@@ -132,6 +132,9 @@ exclude = [
 	"__pycache__",
 	".venv",
 	"site_scons",
+	# Historical upstream gitlinks are inputs to the generated union, not this project's Python code.
+	"IBMTTSDictionaries",
+	"NVDA-IBMTTS-Driver",
 	".github/scripts",
 	# When excluding concrete paths relative to a directory,
 	# not matching multiple folders by name e.g. `__pycache__`,

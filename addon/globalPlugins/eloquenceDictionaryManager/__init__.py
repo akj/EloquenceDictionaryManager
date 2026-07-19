@@ -1,5 +1,9 @@
 """Global plugin entry point for Eloquence Dictionary Manager."""
 
+# The editor imports this module's configuration section name, while this module
+# imports the editor lazily when the user opens it.
+# pyright: reportImportCycles=false
+
 from typing import cast, override
 
 import addonHandler
@@ -22,8 +26,9 @@ CONFIG_SECTION = "eloquenceDictionaryManager"
 
 # Register the add-on-owned NVDA configuration section once when the global
 # plugin module is loaded. ConfigObj applies the default on first access.
-if CONFIG_SECTION not in config.conf.spec:
-	config.conf.spec[CONFIG_SECTION] = {
+configSpec = cast(dict[str, object], config.conf.spec)  # pyright: ignore[reportUnknownMemberType]
+if CONFIG_SECTION not in configSpec:
+	configSpec[CONFIG_SECTION] = {
 		"migrationDismissed": "boolean(default=False)",
 	}
 

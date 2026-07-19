@@ -167,8 +167,10 @@ def empty_historical_digests() -> HistoricalDigests:
 def extract_line_digests(data: bytes, language: Language | str, slot: Slot) -> set[bytes]:
 	"""Decode one historical dictionary blob and hash every well-formed line.
 
-	Both LF and CRLF are canonicalized away. A blank line, bare carriage
-	return, or line without exactly one tab is malformed and silently skipped.
+	Both LF and CRLF are canonicalized away. Blank lines, lines with a bare
+	carriage return, and lines without a tab are silently skipped. After splitting
+	on the first tab, leading tabs in the value are normalized away; a remaining
+	value tab marks the line as malformed and it is skipped.
 	"""
 
 	language_record = LANGUAGES[language] if isinstance(language, str) else language
@@ -181,9 +183,12 @@ def extract_line_digests(data: bytes, language: Language | str, slot: Slot) -> s
 		) from error
 	digests: set[bytes] = set()
 	for line in text.replace("\r\n", "\n").split("\n"):
-		if "\r" in line or line.count("\t") != 1:
+		if not line or "\r" in line or "\t" not in line:
 			continue
-		key, value = line.split("\t")
+		key, value = line.split("\t", maxsplit=1)
+		value = value.lstrip("\t")
+		if "\t" in value:
+			continue
 		digests.add(historical_line_digest(key, value, slot))
 	return digests
 

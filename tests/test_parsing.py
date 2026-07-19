@@ -84,6 +84,18 @@ def test_parser_tolerates_crlf_lf_and_mixed_line_endings(data: bytes) -> None:
 	)
 
 
+def test_permissive_parser_strips_extra_separator_tabs_but_preserves_interior_tabs() -> None:
+	assert parse_dictionary_bytes(
+		b"word\t\tpron\r\ntoo\tmany\ttabs\r\n",
+		"enu",
+		Slot.MAIN,
+		allow_invalid_entries=True,
+	) == (
+		Entry("word", "pron"),
+		Entry("too", "many\ttabs"),
+	)
+
+
 @pytest.mark.parametrize(
 	("slot", "canonical"),
 	[

@@ -109,10 +109,11 @@ def parse_dictionary_bytes(
 ) -> tuple[Entry, ...]:
 	"""Decode and parse LF, CRLF, or mixed-line-ending dictionary bytes.
 
-	When ``allow_invalid_entries`` is true, a line with additional tabs is kept
-	as one entry whose value contains those tabs. This lets the read-only Managed
-	Dictionary Set view surface vendored lines that fail editor validation while
-	still rejecting lines with no key/value separator.
+	When ``allow_invalid_entries`` is true, leading tabs are stripped from the
+	value after splitting on the first tab. Any remaining tabs are kept in the
+	value. This lets legacy separator artifacts parse normally while the read-only
+	Managed Dictionary Set view can still surface other entries that fail editor
+	validation, and lines with no key/value separator remain rejected.
 	"""
 
 	language_record = get_language(language) if isinstance(language, str) else language
@@ -149,6 +150,8 @@ def parse_dictionary_bytes(
 			).format(line=line_number)
 			raise DictionaryFormatError(message)
 		key, value = line.split("\t", maxsplit=1)
+		if allow_invalid_entries:
+			value = value.lstrip("\t")
 		entries.append(Entry(key=key, value=value))
 	return tuple(entries)
 

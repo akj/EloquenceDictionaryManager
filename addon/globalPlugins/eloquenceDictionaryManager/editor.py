@@ -1,8 +1,8 @@
 """Effective-entry editor dialog for Eloquence dictionaries."""
 
-# The wx stubs leave many member types partially unknown, and wx GUI construction
-# discards returned sizer items pervasively, so relax those two rules file-wide.
-# pyright: reportUnknownMemberType=false, reportUnusedCallResult=false
+# The wx stubs leave many member and callback types partially unknown, and wx GUI
+# construction discards returned sizer items pervasively, so relax those rules file-wide.
+# pyright: reportUnknownLambdaType=false, reportUnknownMemberType=false, reportUnusedCallResult=false
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from typing import cast, override
 import addonHandler
 import config
 from gui import guiHelper
-from gui.nvdaControls import (  # pyright: ignore[reportPrivateUsage]
-	_CheckListCtrl,
+from gui.nvdaControls import (
+	_CheckListCtrl,  # pyright: ignore[reportPrivateUsage]
 	AutoWidthColumnListCtrl,
 )
 from gui.settingsDialogs import SettingsDialog
@@ -1240,10 +1240,9 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			return
 		if not rows:
 			wx.MessageBox(
-				# Translators: Message shown when old dictionary files contain no likely hand edits to review.
 				_(
-					"No entries to import were found. "
-					"All readable entries are known upstream content or already match your personal entries.",
+					# Translators: Message shown when old dictionary files contain no likely hand edits to review.
+					"No entries to import were found. All readable entries are known upstream content or already match your personal entries.",
 				),
 				# Translators: Title of migration information shown when there is nothing new to review.
 				_("Import from Old Eloquence Dictionary Files"),
@@ -1311,7 +1310,8 @@ class EloquenceDictionariesDialog(SettingsDialog):
 
 	def _showMigrationNudge(self) -> None:
 		scan = self._migration_discovery.scan
-		if scan is None or not scan.candidates or bool(config.conf[CONFIG_SECTION]["migrationDismissed"]):
+		config_section = cast(dict[str, object], config.conf[CONFIG_SECTION])
+		if scan is None or not scan.candidates or bool(config_section["migrationDismissed"]):
 			return
 		dialog = MigrationNudgeDialog(self)
 		result = dialog.ShowModal()
@@ -1319,7 +1319,7 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		if result == wx.ID_YES:
 			self._showMigrationReview(scan.candidates)
 		elif result == wx.ID_NO:
-			config.conf[CONFIG_SECTION]["migrationDismissed"] = True
+			config_section["migrationDismissed"] = True
 		self._entry_list.SetFocus()
 
 	def _onExport(self, _event: wx.CommandEvent) -> None:
