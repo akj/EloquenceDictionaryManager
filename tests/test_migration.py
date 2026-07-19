@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 from ecidic.historicalunion import HistoricalUnion
+from ecidic.languages import Language
 from ecidic.migration import (
 	MigrationCandidate,
 	MigrationCandidateStatus,
@@ -18,16 +20,21 @@ from ecidic.overlay import PersonalOverlay
 
 class _HistoricalUnionStub(HistoricalUnion):
 	def __init__(self, known: set[tuple[str, Slot, str, str]] | None = None):
-		self.known = known or set()
+		super().__init__()
+		self.known: set[tuple[str, Slot, str, str]] = (
+			known if known is not None else set[tuple[str, Slot, str, str]]()
+		)
 
+	@override
 	def contains(
 		self,
-		language: str,
+		language: Language | str,
 		slot: Slot | str,
 		key: str,
 		value: str,
 	) -> bool:
-		return (language, Slot(slot), key, value) in self.known
+		language_code = language if isinstance(language, str) else language.code
+		return (language_code, Slot(slot), key, value) in self.known
 
 
 def _candidate(
@@ -90,6 +97,25 @@ def test_scanner_preserves_candidate_values_before_import(tmp_path: Path) -> Non
 		Entry("Word", " Value With CASE  "),
 		Entry("MixedCase", "RootValue"),
 	]
+
+
+def test_double_tab_upstream_artifact_is_checkable_unless_present_in_history(tmp_path: Path) -> None:
+	pronunciation = "`[.1ku.2bR.2nE.0Fiz]"
+	_ = (tmp_path / "enuroot.dic").write_bytes(
+		f"kubernetes\t\t{pronunciation}\r\n".encode("cp1252"),
+	)
+
+	scan = scan_migration_directory(tmp_path)
+
+	assert scan.diagnostics == ()
+	assert [candidate.entry for candidate in scan.candidates] == [
+		Entry("kubernetes", pronunciation),
+	]
+	rows = classify_migration_candidates(scan.candidates, PersonalOverlay(), _HistoricalUnionStub())
+	assert len(rows) == 1
+	assert rows[0].checkable
+	historical = _HistoricalUnionStub({("enu", Slot.ROOT, "kubernetes", pronunciation)})
+	assert classify_migration_candidates(scan.candidates, PersonalOverlay(), historical) == ()
 
 
 def test_scanner_ignores_unsupported_voice_codes_and_unrecognized_files(tmp_path: Path) -> None:

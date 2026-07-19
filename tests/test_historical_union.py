@@ -64,6 +64,13 @@ def test_extraction_canonicalizes_line_endings_and_skips_malformed_lines() -> No
 		"enu",
 		Slot.MAIN,
 	)
+	assert extract_line_digests(b"word\t\tpron\r\n", "enu", Slot.MAIN) == extract_line_digests(
+		b"word\tpron\r\n",
+		"enu",
+		Slot.MAIN,
+	)
+	assert extract_line_digests(b"a\tb\tc\r\n", "enu", Slot.MAIN) == set()
+	assert extract_line_digests(b"no separator\r\n", "enu", Slot.MAIN) == set()
 
 
 def _write_digest_file(root: Path, language: str, slot: Slot, *digests: bytes) -> None:
