@@ -249,9 +249,9 @@ class EntryDialog(wx.Dialog):
 		self._rules_control.SetValue(_entry_rules()[self._selectedSlot()])
 
 	def _preview(self, pronunciation: str) -> None:
-		speech.cancelSpeech()
 		synth = synthDriverHandler.getSynth()
 		if synth is not None and is_eloquence_active(synth.name):
+			speech.cancelSpeech()
 			synth.speak([pronunciation])
 			return
 		ui.message(
