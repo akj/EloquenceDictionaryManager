@@ -904,12 +904,13 @@ class EloquenceDictionariesDialog(SettingsDialog):
 
 	def _updateButtons(self) -> None:
 		row = self._selected_row()
-		self._remove_all_button.SetLabel(
-			# Translators: Button for removing all personal entries for the current language. {language} is the localized language name.
-			_("Remove all personal entries for {language}").format(
-				language=_language_display_names()[self._current_language()],
-			),
+		# Translators: Button for removing all personal entries for the current language. {language} is the localized language name.
+		remove_all_label = _("Remove all personal entries for {language}").format(
+			language=_language_display_names()[self._current_language()],
 		)
+		if self._remove_all_button.GetLabel() != remove_all_label:
+			self._remove_all_button.SetLabel(remove_all_label)
+			self.Layout()
 		self._edit_button.Enable(row is not None)
 		self._set_details_button.Enable(
 			row is not None and row.kind is RowKind.MANAGED and self._current_managed_set() is not None,
