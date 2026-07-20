@@ -851,8 +851,10 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		button_helper.sizer.AddStretchSpacer()
 		self._remove_all_button = button_helper.addButton(
 			parent=self,
-			# Translators: Button for removing all personal entries for the current language.
-			label=_("Remove all personal entries"),
+			# Translators: Button for removing all personal entries for the current language. {language} is the localized language name.
+			label=_("Remove all personal entries for {language}").format(
+				language=_language_display_names()[self._current_language()],
+			),
 		)
 		self._remove_all_button.Bind(wx.EVT_BUTTON, self._onRemoveAll)
 		sizer_helper.addItem(button_helper, flag=wx.EXPAND)
@@ -902,6 +904,12 @@ class EloquenceDictionariesDialog(SettingsDialog):
 
 	def _updateButtons(self) -> None:
 		row = self._selected_row()
+		self._remove_all_button.SetLabel(
+			# Translators: Button for removing all personal entries for the current language. {language} is the localized language name.
+			_("Remove all personal entries for {language}").format(
+				language=_language_display_names()[self._current_language()],
+			),
+		)
 		self._edit_button.Enable(row is not None)
 		self._set_details_button.Enable(
 			row is not None and row.kind is RowKind.MANAGED and self._current_managed_set() is not None,
