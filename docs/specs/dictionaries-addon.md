@@ -359,11 +359,13 @@ An editor action group contains:
 - **Import...**
 - **Export...**
 - **Import from old Eloquence dictionary files...**
-- **Remove all personal entries**
+- **Remove all personal entries for <language>**
 
-Despite its concise label, **Remove all personal entries** is language-scoped:
-it removes Personal Dictionary Overlay entries only for the language currently
-shown. Personal entries for other languages and managed entries are unaffected.
+The label names the currently viewed language and updates as the user
+switches languages. **Remove all personal entries for <language>** is
+language-scoped: it removes Personal Dictionary Overlay entries only for that
+language. Personal entries for other languages and managed entries are
+unaffected.
 
 Per-row **Add**, **Edit**/**Customize**, and **Remove** actions remain separate.
 
