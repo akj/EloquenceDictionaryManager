@@ -333,10 +333,20 @@ The editor presents one virtual merged list with columns:
 Word | Pronunciation | Type | Source
 ```
 
-It has a word-prefix filter with exact matches first and a **Show** filter with
-**All**, **Personal**, **Overrides**, and **Managed** choices. Source values are
-`Managed — <name> (<version>)`, `Personal`, and
-`Personal — overrides <name>`.
+Above the list, a **Managed set** choice selects which read-only Managed
+Dictionary Set to compose into the view, with a **None (personal entries
+only)** choice. This viewing choice is not persisted: each time the editor
+opens, it defaults to the first Managed Dictionary Set by display name, or to
+the personal-entries-only view when no Managed Dictionary Set is available. It
+does not select an edit or save target; all changes remain changes to the
+Personal Dictionary Overlay. It is not an active-set setting, and does not
+change the Managed Dictionary Set used by any synth.
+
+The text filter matches word prefixes and pronunciation substrings,
+case-insensitively, with exact word matches ordered first. A separate **Show**
+filter has **All**, **Personal**, **Overrides**, and **Managed** choices. Source
+values are `Managed — <name> (<version>)`, `Personal`, and `Personal — overrides
+<name>`.
 
 Editing a managed row is **Customize**: copy it into the overlay, then edit the
 copy. Removing an override restores the managed default immediately and without
@@ -344,12 +354,18 @@ a separate confirmation; the row changes back to Managed under focus. Removing
 a personal-only entry deletes it from the working copy. Managed entries cannot
 be deleted in v1 because the overlay has no tombstones.
 
-An overlay-wide action group contains:
+An editor action group contains:
 
 - **Import...**
 - **Export...**
 - **Import from old Eloquence dictionary files...**
-- **Remove all personal entries**
+- **Remove all personal entries for <language>**
+
+The label names the currently viewed language and updates as the user
+switches languages. **Remove all personal entries for <language>** is
+language-scoped: it removes Personal Dictionary Overlay entries only for that
+language. Personal entries for other languages and managed entries are
+unaffected.
 
 Per-row **Add**, **Edit**/**Customize**, and **Remove** actions remain separate.
 
