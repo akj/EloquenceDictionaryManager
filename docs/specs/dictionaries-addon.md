@@ -227,16 +227,22 @@ provider's copy. The two copies are the same dataset, so stacking both would
 apply it twice. See
 [ADR 0001](../adr/0001-one-row-per-set-id-provider-copy-wins.md).
 
-Consumers are expected to:
+Consumers are expected to apply a change to the Personal Dictionary Overlay
+without the user restarting NVDA or the synth, after EDM's **OK** writes it.
 
-- turn a provider's set on the first time they discover its ID, for each
-  language that has no Managed Dictionary Set turned on yet, and remember that
-  the ID has been seen so that turning it off sticks; and
-- apply a change to the Personal Dictionary Overlay without the user
-  restarting NVDA or the synth, after EDM's **OK** writes it.
+Whether a newly discovered set starts turned on is each consumer's choice:
 
-EDM never calls into a synth to trigger either. Driver settings, temp-file
-merge mechanics, change detection, host commands, and language-fallback
+- The Eloquence driver turns a provider's set on the first time it discovers
+  the set's ID, for each language that has no Managed Dictionary Set turned on
+  yet, and remembers that the ID has been seen so that turning it off sticks.
+- A consumer whose engine carries its own dictionary may leave sets off, or
+  skip a set for a language its own dictionary already covers. OpenEVV starts
+  with no set chosen and never applies `github.eigencrow.ibmtts-dictionaries`
+  to US English, because its built-in US English dictionary began as that set
+  and has been corrected since.
+
+EDM never calls into a synth to apply a change or turn a set on. Driver
+settings, temp-file merge mechanics, change detection, host commands, and language-fallback
 implementation belong in each consumer repository, not here.
 
 ### Eloquence migration backup path
