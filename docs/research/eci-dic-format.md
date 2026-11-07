@@ -335,9 +335,9 @@ expansion), explicitly *not* arbitrary substrings — `prego` won't fire inside
 - Duplicate keys **do occur in shipped files**: `ENURoot.dic` has **23** keys appearing
   twice (e.g. `acesulfame` at lines 22759 and 64104, with *different* SPRs
   `.0sx.` vs `.0sX.`), `ENUmain.dic` has 2, `enuroot.dic` has 1. So the format does not
-  forbid them. The IBMTTSDictionaries curator removed the `ENURoot.dic` and
-  `ENUmain.dic` duplicates upstream on 2026-11-07, after the v26.11 tag
-  ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173)).
+  forbid them. The IBMTTSDictionaries curator removed some duplicates from
+  `ENURoot.dic` and `ENUmain.dic` upstream on 2026-11-07 (commit `a0a3e47`, after the
+  v26.11 tag).
 - **Resolution is last-wins** **[engine]**. The manual never states this for file
   loading, but it fits the engine's last-write-wins key store (`eciUpdateDict` *"is
   updated if the key already exists"*, tts.txt:3072–3075), and the IBMTTSDictionaries
