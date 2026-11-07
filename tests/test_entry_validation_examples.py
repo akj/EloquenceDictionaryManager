@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import pytest
 
@@ -13,13 +13,13 @@ from ecidic import Entry, ValidationCode, validate_entry
 EXAMPLES_PATH = Path(__file__).resolve().parents[1] / "docs" / "entry-validation-examples.json"
 
 
-class _Example(TypedDict, total=False):
+class _Example(TypedDict):
 	voice: str
 	slot: str
 	key: str
 	value: str
 	expected: str
-	note: str
+	note: NotRequired[str]
 
 
 class _ExamplesFile(TypedDict):
