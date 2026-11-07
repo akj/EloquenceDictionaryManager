@@ -653,7 +653,10 @@ class EloquenceDictionariesDialog(SettingsDialog):
 				diagnostic.path,
 				diagnostic.reason,
 			)
-		self._migration_discovery = discover_migration_candidates(_available_provider_paths())
+		self._migration_discovery = discover_migration_candidates(
+			Path(NVDAState.WritePaths.configDir),
+			_available_provider_paths(),
+		)
 		self._logMigrationDiagnostics(self._migration_discovery.diagnostics)
 		self._views: dict[tuple[str, str | None], EffectiveView] = {}
 		self._rows: tuple[EffectiveRow, ...] = ()
@@ -1287,7 +1290,10 @@ class EloquenceDictionariesDialog(SettingsDialog):
 		self._refreshAfterMutation()
 
 	def _onMigrationImport(self, _event: wx.CommandEvent) -> None:
-		discovery = discover_migration_candidates(_available_provider_paths())
+		discovery = discover_migration_candidates(
+			Path(NVDAState.WritePaths.configDir),
+			_available_provider_paths(),
+		)
 		self._logMigrationDiagnostics(discovery.diagnostics)
 		if discovery.scan is not None and discovery.scan.candidates:
 			self._showMigrationReview(discovery.scan.candidates)

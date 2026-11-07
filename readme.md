@@ -130,11 +130,11 @@ AltIBMTTSDictionaries. Known upstream content is skipped, so the review shows
 only entries that look like your own changes. The tool never modifies or
 deletes the old files.
 
-The tool first looks in the old Eloquence add-on's
-`synthDrivers/eloquence-dic-backup` folder and then its live
-`synthDrivers/eloquence` folder. If nothing is found automatically, the button
-opens **Select Old Eloquence Dictionary Folder** so you can choose another
-location.
+The tool first looks for the backup the Eloquence add-on keeps in your NVDA
+configuration folder, `eciDictionaries/legacy/eloquence`, and then in the
+installed Eloquence add-on's live `synthDrivers/eloquence` folder. If nothing is
+found automatically, the button opens **Select Old Eloquence Dictionary
+Folder** so you can choose another location.
 
 When old files are detected automatically, **Old Eloquence Dictionary Files**
 asks whether to review them. Choose **Yes** to review now, **Later** to be asked

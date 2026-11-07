@@ -31,7 +31,7 @@ except (ImportError, ModuleNotFoundError):
 		return text
 
 
-_BACKUP_DIRECTORY_NAMES = ("eloquence-dic-backup", "eloquence")
+_CONFIG_BACKUP_PARTS = ("eciDictionaries", "legacy", "eloquence")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,23 +122,25 @@ def _find_case_insensitive_directory(parent: Path, expected_name: str) -> tuple[
 	)
 
 
-def find_eloquence_backup_directories(provider_paths: Sequence[str | Path]) -> tuple[Path, ...]:
+def find_eloquence_backup_directories(
+	config_directory: str | Path,
+	provider_paths: Sequence[str | Path],
+) -> tuple[Path, ...]:
 	"""Find legacy Eloquence directories in backup-first, then live-driver order.
 
-	Every installed add-on path is considered for the pinned backup name before
-	any live ``eloquence`` directory. Directory-name comparison is case-insensitive
-	so the behavior does not depend on the host filesystem.
+	The Eloquence migration backup in the active NVDA configuration comes first,
+	followed by the live ``synthDrivers/eloquence`` directory of each installed
+	add-on. Add-on directory-name comparison is case-insensitive so the behavior
+	does not depend on the host filesystem.
 	"""
 
-	providers = tuple(Path(path) for path in provider_paths)
-	synth_roots = tuple(
-		(provider, _find_case_insensitive_directory(provider, "synthDrivers")) for provider in providers
-	)
 	result: list[Path] = []
-	for directory_name in _BACKUP_DIRECTORY_NAMES:
-		for _provider, roots in synth_roots:
-			for root in roots:
-				result.extend(_find_case_insensitive_directory(root, directory_name))
+	backup = Path(config_directory).joinpath(*_CONFIG_BACKUP_PARTS)
+	if backup.is_dir():
+		result.append(backup)
+	for provider in provider_paths:
+		for root in _find_case_insensitive_directory(Path(provider), "synthDrivers"):
+			result.extend(_find_case_insensitive_directory(root, "eloquence"))
 	return tuple(result)
 
 
@@ -195,11 +197,14 @@ def scan_migration_directory(directory: str | Path) -> MigrationScan:
 	)
 
 
-def discover_migration_candidates(provider_paths: Sequence[str | Path]) -> MigrationDiscovery:
+def discover_migration_candidates(
+	config_directory: str | Path,
+	provider_paths: Sequence[str | Path],
+) -> MigrationDiscovery:
 	"""Scan auto-detected locations until the first one with a decodable dictionary."""
 
 	diagnostics: list[MigrationDiagnostic] = []
-	for directory in find_eloquence_backup_directories(provider_paths):
+	for directory in find_eloquence_backup_directories(config_directory, provider_paths):
 		scan = scan_migration_directory(directory)
 		diagnostics.extend(scan.diagnostics)
 		if scan.decoded_files:

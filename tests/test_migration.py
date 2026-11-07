@@ -140,46 +140,82 @@ def test_invalid_files_and_directories_are_skipped_with_diagnostics(tmp_path: Pa
 	assert invalid.diagnostics[0].path == tmp_path / "enumain.dic"
 
 
-def test_backup_discovery_is_case_insensitive_and_globally_backup_first(tmp_path: Path) -> None:
+def _config_backup(config: Path) -> Path:
+	return config / "eciDictionaries" / "legacy" / "eloquence"
+
+
+def test_discovery_finds_config_backup_before_case_insensitive_live_directories(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	backup = _config_backup(config)
 	first_provider = tmp_path / "first"
 	second_provider = tmp_path / "second"
 	first_live = first_provider / "SynthDrivers" / "ELOQUENCE"
-	second_backup = second_provider / "synthDrivers" / "Eloquence-Dic-Backup"
+	second_live = second_provider / "synthDrivers" / "eloquence"
+	backup.mkdir(parents=True)
 	first_live.mkdir(parents=True)
-	second_backup.mkdir(parents=True)
+	second_live.mkdir(parents=True)
 
-	assert find_eloquence_backup_directories((first_provider, second_provider)) == (
-		second_backup,
+	assert find_eloquence_backup_directories(config, (first_provider, second_provider)) == (
+		backup,
 		first_live,
+		second_live,
 	)
 
 
-def test_auto_scan_short_circuits_after_first_directory_with_candidates(tmp_path: Path) -> None:
+def test_discovery_without_config_backup_returns_only_live_directories(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	config.mkdir()
 	provider = tmp_path / "addon"
-	backup = provider / "synthDrivers" / "eloquence-dic-backup"
+	live = provider / "synthDrivers" / "eloquence"
+	live.mkdir(parents=True)
+
+	assert find_eloquence_backup_directories(config, (provider,)) == (live,)
+
+
+def test_auto_scan_short_circuits_after_first_directory_with_candidates(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	backup = _config_backup(config)
+	provider = tmp_path / "addon"
 	live = provider / "synthDrivers" / "eloquence"
 	backup.mkdir(parents=True)
-	live.mkdir()
+	live.mkdir(parents=True)
 	_ = (backup / "enumain.dic").write_bytes(b"backup\tchosen\r\n")
 	_ = (live / "enumain.dic").write_bytes(b"live\tnot chosen\r\n")
 
-	discovery = discover_migration_candidates((provider,))
+	discovery = discover_migration_candidates(config, (provider,))
 
 	assert discovery.scan is not None
 	assert discovery.scan.directory == backup
 	assert [item.entry for item in discovery.scan.candidates] == [Entry("backup", "chosen")]
 
 
-def test_auto_scan_falls_through_empty_or_unreadable_backup_to_live_directory(tmp_path: Path) -> None:
+def test_auto_scan_falls_back_to_live_directory_without_config_backup(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	config.mkdir()
 	provider = tmp_path / "addon"
-	backup = provider / "synthDrivers" / "eloquence-dic-backup"
+	live = provider / "synthDrivers" / "eloquence"
+	live.mkdir(parents=True)
+	_ = (live / "enumain.dic").write_bytes(b"live\tchosen\r\n")
+
+	discovery = discover_migration_candidates(config, (provider,))
+
+	assert discovery.scan is not None
+	assert discovery.scan.directory == live
+	assert [item.entry for item in discovery.scan.candidates] == [Entry("live", "chosen")]
+	assert discovery.diagnostics == ()
+
+
+def test_auto_scan_falls_through_empty_or_unreadable_backup_to_live_directory(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	backup = _config_backup(config)
+	provider = tmp_path / "addon"
 	live = provider / "synthDrivers" / "eloquence"
 	backup.mkdir(parents=True)
-	live.mkdir()
+	live.mkdir(parents=True)
 	_ = (backup / "enumain.dic").write_bytes(b"invalid\r\n")
 	_ = (live / "enumain.dic").write_bytes(b"live\tchosen\r\n")
 
-	discovery = discover_migration_candidates((provider,))
+	discovery = discover_migration_candidates(config, (provider,))
 
 	assert discovery.scan is not None
 	assert discovery.scan.directory == live
@@ -187,15 +223,16 @@ def test_auto_scan_falls_through_empty_or_unreadable_backup_to_live_directory(tm
 
 
 def test_auto_scan_does_not_fall_through_a_decodable_empty_dictionary(tmp_path: Path) -> None:
+	config = tmp_path / "config"
+	backup = _config_backup(config)
 	provider = tmp_path / "addon"
-	backup = provider / "synthDrivers" / "eloquence-dic-backup"
 	live = provider / "synthDrivers" / "eloquence"
 	backup.mkdir(parents=True)
-	live.mkdir()
+	live.mkdir(parents=True)
 	_ = (backup / "enumain.dic").write_bytes(b"")
 	_ = (live / "enumain.dic").write_bytes(b"live\tnot scanned\r\n")
 
-	discovery = discover_migration_candidates((provider,))
+	discovery = discover_migration_candidates(config, (provider,))
 
 	assert discovery.scan is not None
 	assert discovery.scan.directory == backup
