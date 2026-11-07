@@ -255,6 +255,12 @@ editor must *not* do; it also confirms CP1252 was the assumed Western on-disk en
   sentence-initial capitals. This is why root files are written all-lowercase.
 - **Key:** *a single word in ordinary spelling, all lowercase letters.* **NO** digits,
   punctuation, whitespace, or other non-letter characters (tts.txt:440–445).
+- **Exception: internal apostrophes work in practice.** **[convention]** The
+  IBMTTSDictionaries curators report that root keys such as `j'accuse` work in the
+  engine ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173)),
+  and the bundled `enuroot.dic` has 112 keys with an apostrophe (`j'accuse`,
+  `schoolma'am`). EDM accepts an apostrophe in a root key on the same terms as in an
+  abbreviation key: not first, not last, and not next to another apostrophe.
 - **Translation:** a single word in ordinary spelling **OR** a valid SPR. **NO**
   digits, punctuation, non-letter chars, whitespace, **tags, or annotations**
   (tts.txt:442–447). I.e. in roots, the value may be a bare respelled word or a
@@ -263,7 +269,7 @@ editor must *not* do; it also confirms CP1252 was the assumed Western on-disk en
   (tts.txt:449). Cannot override function words like *the*/*to* (tts.txt:433–434);
   may misfire on unknown roots (tts.txt:429–432).
 - Real data: `ribcage<TAB>`[r1Ib.2keJ]`, `encrypt<TAB>`[.0XG.1krIpt]` — key lowercase
-  letters only, value a single SPR. This slot is where the bulk lives (`ENURoot.dic` =
+  letters, value a single SPR. This slot is where the bulk lives (`ENURoot.dic` =
   67 629 entries).
 
 ### Abbreviations dictionary (`eciAbbvDict`, slot 2)
@@ -451,14 +457,56 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
 - **Forbidden by construction:**
   - **Tab** cannot appear inside a key or value (it *is* the separator). **[engine]**
   - **Newline** cannot appear inside an entry (one entry per line). **[engine]**
-  - **Whitespace in a key:** forbidden in main and abbr; forbidden entirely in roots
-    (roots keys are letters only). **[engine]**
+  - **Whitespace in a key:** forbidden in main, abbr, and roots. **[engine]**
   - **Key final character** must not be punctuation (main); abbr keys allow only
-    letters/periods/internal-apostrophe; roots keys allow only letters. **[engine]**
+    letters/periods/internal-apostrophe; roots keys allow only letters and internal
+    apostrophes (the apostrophe exception is **[convention]**, see §5).
   - **NUL (0x00):** the engine takes NULL-terminated C strings (tts.txt:585–588), so an
     embedded NUL truncates — never allow it. **[engine, by API]**
   - **Bytes outside the active code page:** for Western that's non-CP1252 bytes; the
     old updater's response was to strip them (lossy). **[convention]**
+
+---
+
+## 11. Shared validation examples
+
+[`docs/entry-validation-examples.json`](../entry-validation-examples.json) lists example
+entries and whether each is valid. Any tool that validates Western `.dic` entries, such
+as a synth driver that checks dictionary files before loading them, can test against it
+without importing EDM. EDM's own test suite
+(`tests/test_entry_validation_examples.py`) checks every example against the editor's
+validator, so the file always matches what the editor accepts.
+
+The file is UTF-8 JSON with three top-level members:
+
+- `about`: a one-paragraph description of the file.
+- `reasons`: an object that maps each rule identifier to a plain-language description
+  of the rule. EDM's validator uses the same identifiers.
+- `examples`: an array of objects with these members:
+
+  | Member | Meaning |
+  |---|---|
+  | `voice` | ECI voice code, such as `enu` or `deu` |
+  | `slot` | `main`, `root`, or `abbr`, as in the `<voice><slot>.dic` filename |
+  | `key` | The entry key |
+  | `value` | The entry value |
+  | `expected` | `valid`, or the identifier of the one rule the entry breaks |
+  | `note` | Optional. Why the example matters |
+
+JSON string escapes carry the characters that a `.dic` line cannot hold: `\t` (tab),
+`\n` and `\r` (line breaks), and `\u0000` (NUL). Each invalid example breaks exactly
+one rule, so a validator that stops at the first failure and one that reports every
+failure must both return that one reason.
+
+To use the file from another project:
+
+1. Copy it into your test suite, and record the EDM commit it came from.
+2. For each example, validate the key and value for its voice and slot. Assert that
+   valid examples pass and that invalid examples fail. If your validator reports
+   reasons, map your reasons to the identifiers in `reasons` and assert the match.
+3. When the file changes upstream, copy the new version and fix any examples your
+   validator now disagrees with. A change to this file is a change to the definition of
+   a valid entry.
 
 ---
 
@@ -469,7 +517,8 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
    apply that slot's rules:
    - *Main:* key = no whitespace, last char not punctuation; value = anything (may hold
      SPR/annotations).
-   - *Roots:* key = lowercase letters only; value = a single bare word **or** one
+   - *Roots:* key = letters with optional internal apostrophes, stored lowercase;
+     value = a single bare word **or** one
      `` `[…] `` SPR — reject annotations, digits, punctuation, whitespace, multi-word.
    - *Abbr:* key = letters + optional periods + internal apostrophe; value = plain
      word(s) separated by space/hyphen — reject digits/punctuation/SPR/annotations.

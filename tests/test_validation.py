@@ -60,7 +60,7 @@ def test_exact_word_values_allow_text_annotations_and_structurally_valid_sprs() 
 @pytest.mark.parametrize(
 	("entry", "expected"),
 	[
-		(Entry("Win32", "word"), ValidationCode.ROOT_KEY_NOT_LETTERS),
+		(Entry("Win32", "word"), ValidationCode.ROOT_KEY_INVALID),
 		(Entry("root", "two words"), ValidationCode.ROOT_VALUE_INVALID),
 		(Entry("root", "word2"), ValidationCode.ROOT_VALUE_INVALID),
 		(Entry("root", "`0 word"), ValidationCode.ROOT_VALUE_INVALID),
@@ -79,9 +79,25 @@ def test_word_root_allows_bare_word_or_bare_spr_and_is_stored_lowercase() -> Non
 	)
 
 
+@pytest.mark.parametrize("key", ["j'accuse", "schoolma'am", "O'Neill"])
+def test_word_root_allows_apostrophes_inside_the_word(key: str) -> None:
+	assert validate_entry(Entry(key, "word"), Slot.ROOT, "enu") == ()
+
+
+@pytest.mark.parametrize("key", ["'tis", "dogs'", "a''b", "'", "rock-n-roll"])
+def test_word_root_rejects_apostrophes_at_the_edges_doubled_or_other_punctuation(key: str) -> None:
+	issues = validate_entry(Entry(key, "word"), Slot.ROOT, "enu")
+
+	assert [issue.code for issue in issues] == [ValidationCode.ROOT_KEY_INVALID]
+	assert issues[0].message == (
+		"Word roots can contain only letters, with apostrophes inside the word. "
+		+ f'"{key}" cannot be a word root — for words with digits or symbols, use an Exact word entry.'
+	)
+
+
 @pytest.mark.parametrize(
 	"key",
-	[".Dr", "Dr..", "Dr'", "'Dr", "D''r", "Dr!", "D2", "two words"],
+	[".Dr", "Dr..", "Dr'", "'Dr", "D''r", "Dr!", "D2", "two words", "Dipl.-Ing."],
 )
 def test_abbreviation_key_validation_catalog(key: str) -> None:
 	assert codes(Entry(key, "doctor"), Slot.ABBREVIATION) == [
