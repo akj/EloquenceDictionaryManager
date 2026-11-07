@@ -39,12 +39,11 @@ the engine does not enforce). Confidence is flagged where evidence is thin.
    populate `eciMainDictExt` from a plain key⇥value file — and if so, what POS it
    assumes — is **unverified and probably untestable without an Asian engine build**.
 
-3. **Duplicate-key resolution (first-wins vs last-wins) is inferred, not documented.**
-   The manual documents `eciUpdateDict` as *last-write-wins by key* (lines 3072–3076),
-   and duplicate keys demonstrably exist in shipped files (23 in `ENURoot.dic`), but the
-   manual never states how `eciLoadDict` resolves duplicates within one file. Last-wins
-   is the strong inference; see §7. **Confidence: medium.** For our own merge/dedup we
-   control this ourselves and need not rely on engine behaviour.
+3. **Resolved: duplicate keys within one file resolve last-wins.** The manual never
+   states how `eciLoadDict` handles a key that appears twice, but the IBMTTSDictionaries
+   curator reports that the second occurrence controls pronunciation; see §7.
+   **Confidence: high.** For our own merge/dedup we control this ourselves and need not
+   rely on engine behaviour.
 
 4. **CP1252 vs ISO-8859-1 is a toolchain choice, not byte-provable.** The high bytes
    observed in Western files (0xE0, 0xEA, 0xFC …) are identical in CP1252 and
@@ -336,14 +335,17 @@ expansion), explicitly *not* arbitrary substrings — `prego` won't fire inside
 - Duplicate keys **do occur in shipped files**: `ENURoot.dic` has **23** keys appearing
   twice (e.g. `acesulfame` at lines 22759 and 64104, with *different* SPRs
   `.0sx.` vs `.0sX.`), `ENUmain.dic` has 2, `enuroot.dic` has 1. So the format does not
-  forbid them and real curators haven't de-duplicated.
-- **Resolution is last-wins — inferred, not documented for `eciLoadDict`.** The engine's
-  key store is last-write-wins: `eciUpdateDict` *"is updated if the key already exists"*
-  (tts.txt:3072–3075). If `eciLoadDict` applies entries top-to-bottom (the natural
-  implementation), the **last** occurrence in the file wins. The manual never states
-  this for file loading, and entries are stored "in no particular order"
-  (tts.txt:2496), so a lookup can't be predicted from file order after load.
-  **Confidence: medium.**
+  forbid them. The IBMTTSDictionaries curator removed some duplicates from
+  `ENURoot.dic` and `ENUmain.dic` upstream on 2026-11-07 (commit `a0a3e47`, after the
+  v26.11 tag).
+- **Resolution is last-wins.** The manual never states this for file
+  loading, but it fits the engine's last-write-wins key store (`eciUpdateDict` *"is
+  updated if the key already exists"*, tts.txt:3072–3075), and the IBMTTSDictionaries
+  curator reports that the second occurrence is the one spoken
+  ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173),
+  2026-11-07). Entries are stored "in no particular order" (tts.txt:2496), so file
+  order decides which occurrence wins at load time, not lookup order afterwards.
+  **Confidence: high** (curator listening report, not a test we ran).
 
 **Implication for our merge/dedup:** don't depend on engine duplicate-handling.
 Deduplicate **before** writing the merged temp file — one entry per (slot, key), with
