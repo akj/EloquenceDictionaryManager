@@ -9,7 +9,7 @@ from unittest.mock import call, Mock
 
 import pytest
 
-from ecidic.preview import is_eloquence_active
+from ecidic.preview import can_preview
 
 
 EDITOR_PATH = (
@@ -79,16 +79,24 @@ def editor_module(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 	return module
 
 
-def test_eloquence_is_active() -> None:
-	assert is_eloquence_active("eloquence")
+@pytest.mark.parametrize(
+	("synth_name", "expected"),
+	[
+		("eloquence", True),
+		("openevv", True),
+		("reloqC", False),
+		(None, False),
+		("", False),
+		("espeak", False),
+		("Eloquence", False),
+		("OpenEVV", False),
+	],
+)
+def test_can_preview(synth_name: str | None, expected: bool) -> None:
+	assert can_preview(synth_name) is expected
 
 
-@pytest.mark.parametrize("synth_name", [None, "", "espeak", "Eloquence"])
-def test_other_synth_names_are_not_active(synth_name: str | None) -> None:
-	assert not is_eloquence_active(synth_name)
-
-
-def test_preview_does_not_cancel_speech_when_eloquence_is_inactive(editor_module: ModuleType) -> None:
+def test_preview_does_not_cancel_speech_when_synth_cannot_preview(editor_module: ModuleType) -> None:
 	synth = Mock(name="synth")
 	synth.name = "espeak"
 	editor_module.synthDriverHandler.getSynth.return_value = synth
@@ -98,14 +106,18 @@ def test_preview_does_not_cancel_speech_when_eloquence_is_inactive(editor_module
 	editor_module.speech.cancelSpeech.assert_not_called()
 	synth.speak.assert_not_called()
 	editor_module.ui.message.assert_called_once_with(
-		"Preview unavailable: Eloquence is not the active synthesizer.",
+		"Preview unavailable: switch to Eloquence or OpenEVV to hear pronunciations.",
 	)
 
 
-def test_preview_cancels_speech_before_speaking_with_eloquence(editor_module: ModuleType) -> None:
+@pytest.mark.parametrize("synth_name", ["eloquence", "openevv"])
+def test_preview_cancels_speech_before_speaking_with_previewing_synth(
+	editor_module: ModuleType,
+	synth_name: str,
+) -> None:
 	call_order = Mock()
 	synth = Mock(name="synth")
-	synth.name = "eloquence"
+	synth.name = synth_name
 	editor_module.speech.cancelSpeech.side_effect = call_order.cancelSpeech
 	synth.speak.side_effect = call_order.speak
 	editor_module.synthDriverHandler.getSynth.return_value = synth

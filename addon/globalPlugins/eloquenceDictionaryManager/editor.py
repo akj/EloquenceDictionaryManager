@@ -49,7 +49,7 @@ from .ecidic.migration import (
 from .ecidic.model import Entry, Slot
 from .ecidic.overlay import load_personal_overlay, save_personal_overlay
 from .ecidic.parsing import DictionaryEncodingError, key_identity
-from .ecidic.preview import is_eloquence_active
+from .ecidic.preview import can_preview
 from .ecidic.sets import ManagedSet, discover_managed_sets
 from .ecidic.validation import EntryValidationError, Field, normalize_entry, validate_entry
 from . import CONFIG_SECTION
@@ -213,7 +213,7 @@ class EntryDialog(wx.Dialog):
 		preview_button_helper = guiHelper.ButtonHelper(orientation=wx.HORIZONTAL)
 		self._play_current_button = preview_button_helper.addButton(
 			parent=self,
-			# Translators: Button for previewing how Eloquence currently speaks the word.
+			# Translators: Button for previewing how the active synthesizer currently speaks the word.
 			label=_("Play &current"),
 		)
 		self._play_current_button.Bind(wx.EVT_BUTTON, self._onPlayCurrent)
@@ -250,13 +250,14 @@ class EntryDialog(wx.Dialog):
 
 	def _preview(self, pronunciation: str) -> None:
 		synth = synthDriverHandler.getSynth()
-		if synth is not None and is_eloquence_active(synth.name):
+		if synth is not None and can_preview(synth.name):
 			speech.cancelSpeech()
 			synth.speak([pronunciation])
 			return
 		ui.message(
-			# Translators: Message announced when a pronunciation preview cannot use Eloquence.
-			_("Preview unavailable: Eloquence is not the active synthesizer."),
+			# Translators: Message announced when the active synthesizer cannot preview pronunciations.
+			# Eloquence and OpenEVV are synthesizer names.
+			_("Preview unavailable: switch to Eloquence or OpenEVV to hear pronunciations."),
 		)
 
 	def _onPlayCurrent(self, _event: wx.CommandEvent) -> None:
