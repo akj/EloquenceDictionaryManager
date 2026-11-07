@@ -63,7 +63,7 @@
 		{"voice": "enu", "slot": "root", "key": "root", "value": "it's", "expected": "rootValueInvalid", "note": "Apostrophes are allowed in root keys, not root values."},
 
 		{"voice": "enu", "slot": "abbr", "key": "Dr.", "value": "doctor", "expected": "valid", "note": "A trailing period means the key matches only Dr. with the period."},
-		{"voice": "enu", "slot": "abbr", "key": "approx", "value": "approximately", "expected": "valid", "note": "Without a trailing period the key matches approx and approx."},
+		{"voice": "enu", "slot": "abbr", "key": "approx", "value": "approximately", "expected": "valid", "note": "Without a trailing period the key matches approx with or without a following period."},
 		{"voice": "enu", "slot": "abbr", "key": "e.g.", "value": "for example", "expected": "valid"},
 		{"voice": "enu", "slot": "abbr", "key": "WWII's", "value": "world war twos", "expected": "valid"},
 		{"voice": "enu", "slot": "abbr", "key": "Ltjg", "value": "lieutenant junior-grade", "expected": "valid"},
