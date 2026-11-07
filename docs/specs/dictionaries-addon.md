@@ -54,13 +54,15 @@ but is not a v1 acceptance criterion.
 The effective pronunciation for a language has three layers:
 
 1. **Engine baseline**: Eloquence's built-in pronunciation rules and lexicon.
-2. **Managed Dictionary Set**: one set selected by the consuming synth from
-   EDM's immutable installed content.
+2. **Managed Dictionary Sets**: one or more sets the consuming synth turns on
+   for the language, in an order the synth chooses. Later sets override earlier
+   ones per key.
 3. **Personal Dictionary Overlay**: user-owned entries shared by compatible
    synths from the active NVDA configuration.
 
-Precedence is per language, slot, and key: Personal overrides Managed, which
-overrides the engine baseline. An overlay entry replaces only the matching key;
+Precedence is per language, slot, and key: Personal overrides every Managed
+set, whatever order the synth uses for them, and Managed overrides the engine
+baseline. An overlay entry replaces only the matching key;
 it never selects a whole replacement file. Root keys compare case-insensitively;
 main and abbreviation keys compare exactly. The ECI engine accepts one file per
 slot, so the consumer must realize this precedence before loading. The details
@@ -82,7 +84,9 @@ This section is the complete provider/consumer contract resolved in
 [ticket #5](https://github.com/akj/EloquenceDictionaryManager/issues/5), with
 the additive amendments from
 [ticket #8](https://github.com/akj/EloquenceDictionaryManager/issues/8) and
-[ticket #13](https://github.com/akj/EloquenceDictionaryManager/issues/13).
+[ticket #13](https://github.com/akj/EloquenceDictionaryManager/issues/13), and
+the consumer rules agreed with the Eloquence maintainers on
+[fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173).
 
 ### Purpose and discovery
 
@@ -204,26 +208,56 @@ configuration also keeps secure or portable configurations isolated.
 ### Missing sets and consumer expectations
 
 If a selected Managed Dictionary Set is unavailable, the synth must not silently
-substitute another set. It retains the selected ID, loads no managed layer,
-continues applying the personal overlay when enabled, and reports the unavailable
+substitute another set. It retains the selected ID, leaves out only that set,
+keeps applying its other selected sets and the personal overlay when enabled,
+and reports the unavailable
 selection in its UI or diagnostic log. The set resumes automatically if the same
 ID returns. Engine pronunciation is the safety net.
 
-Synths do not bundle duplicate community sets. Driver settings, temp-file merge
-mechanics, host commands, and language-fallback implementation belong in each
-consumer repository, not here.
+Synths do not bundle duplicate community sets. A synth may download a set for
+the user at runtime; that copy is the user's choice and is not covered by
+EDM's licensing or review. A downloaded copy uses the set's Managed Dictionary
+Set ID and the same `.dic` file layout as an installed copy, and the synth
+treats it like an installed set once downloaded. EDM's redistribution
+requirements, such as license metadata in `set.ini`, do not apply to it.
+
+When an installed provider and a synth's own download both supply the same
+set ID, the synth shows one row for that set and uses the installed
+provider's copy. The two copies are the same dataset, so stacking both would
+apply it twice. See
+[ADR 0001](../adr/0001-one-row-per-set-id-provider-copy-wins.md).
+
+Consumers are expected to:
+
+- turn a provider's set on the first time they discover its ID, for each
+  language that has no Managed Dictionary Set turned on yet, and remember that
+  the ID has been seen so that turning it off sticks; and
+- apply a change to the Personal Dictionary Overlay without the user
+  restarting NVDA or the synth, after EDM's **OK** writes it.
+
+EDM never calls into a synth to trigger either. Driver settings, temp-file
+merge mechanics, change detection, host commands, and language-fallback
+implementation belong in each consumer repository, not here.
 
 ### Eloquence migration backup path
 
-The old Eloquence driver writes its migration backup to:
+When the Eloquence driver migrates Old Eloquence Dictionary Files, it writes
+one backup copy to:
 
 ```text
-<installed Eloquence add-on>/synthDrivers/eloquence-dic-backup/
+<active NVDA configuration>/
+  eciDictionaries/
+    legacy/
+      eloquence/
 ```
 
-This is a sibling of `synthDrivers/eloquence/`. EDM only reads these locations;
-it never writes, modifies, or deletes the old files. The consumer repository
-owns creation of the backup and the removal of legacy loading behavior.
+Eloquence writes this folder once and never modifies it afterwards. It lives
+in the configuration rather than in the Eloquence add-on folder because NVDA
+replaces an add-on's folder on every update (see
+[ADR 0002](../adr/0002-legacy-backup-in-nvda-configuration.md)). EDM only
+reads this location; it
+never writes, modifies, or deletes the old files. The consumer repository owns
+creation of the backup and the removal of legacy loading behavior.
 
 ## Bundled content, licensing, and refresh
 
@@ -272,7 +306,10 @@ Bundled content is refreshed only by a pinned maintainer-run workflow:
 
 This is not a git-submodule, runtime-download, or ordinary-build download flow.
 New upstream releases never auto-merge or auto-publish. An EDM release may
-legitimately retain an older pinned source version.
+legitimately retain an older pinned source version. Because a provider's copy
+takes precedence over a synth's download of the same set, EDM aims to publish
+a refresh for each upstream release tag, so the curators' tags set the pace at
+which their corrections reach users.
 
 ## Western-language scope
 
@@ -394,16 +431,32 @@ The minimum validation contract is:
   inside either field;
 - **Exact word** keys contain no whitespace and do not end in punctuation;
   values may contain ordinary text, SPRs, and annotations;
-- **Word root** keys contain letters only and are stored lowercase; values are
-  one bare word or one bare SPR, with no annotation or multi-word value;
+- **Word root** keys contain letters, with apostrophes allowed inside the word
+  (`j'accuse`), and are stored lowercase; values are one bare word or one bare
+  SPR, with no annotation or multi-word value. The manual allows letters only,
+  but the IBMTTSDictionaries curators report that apostrophe keys work, and the
+  bundled set relies on them;
 - **Abbreviation** keys contain letters, meaningful periods, and permitted
   internal apostrophes only; values contain plain words separated by spaces or
   hyphens, with no SPR or annotation; and
-- SPR structure is validated, but per-language phoneme-symbol legality is not.
+- SPR structure is validated. Per-language phoneme-symbol legality (for
+  example, rejecting lowercase `j` in American English) is planned follow-up
+  work using the manual's SPR tables
+  ([#64](https://github.com/akj/EloquenceDictionaryManager/issues/64)), and
+  does not block consumer integration.
+
+Hyphens in abbreviation keys (`Dipl.-Ing.`) stay invalid until engine tests or
+the German curators confirm they work.
 
 The exact user-facing validation catalog and Rules copy are frozen by the
 prototype walkthrough; the engine rationale and edge cases are in
 [ECI `.dic` format](../research/eci-dic-format.md).
+
+Synths that validate dictionary files share this definition of a valid entry
+through the format document and a shared set of example valid and invalid
+lines that each validator tests against
+([#63](https://github.com/akj/EloquenceDictionaryManager/issues/63)). They do not import EDM's code at
+runtime, because EDM may be disabled or removed.
 
 ### Preview
 
@@ -483,9 +536,9 @@ files.
 
 ### Discovery and entry points
 
-The tool auto-scans the pinned
-`synthDrivers/eloquence-dic-backup/` directory first, then the live
-`synthDrivers/eloquence/` directory, both inside the installed Eloquence add-on.
+The tool auto-scans the backup at `eciDictionaries/legacy/eloquence/` in the
+active NVDA configuration first, then the live `synthDrivers/eloquence/`
+directory inside an installed Eloquence add-on that predates the migration.
 A folder picker covers portable and unusual setups.
 
 The dedicated editor button is always present and opens the picker if nothing
@@ -594,6 +647,8 @@ labels are translatable.
   engine experiment succeeds.
 - Integration with NVDA speech pronunciation dictionaries, which operate at a
   different text-substitution layer.
-- New dictionary formats, non-ECI synths, or runtime downloads.
+- New dictionary formats, non-ECI synths, or runtime downloads by EDM. Synths
+  may still download sets for the user, as described under the directory
+  contract.
 - Specifying an individual synth driver's settings UI, merge implementation,
   host protocol, legacy backup writer, or removal plan beyond this contract.
