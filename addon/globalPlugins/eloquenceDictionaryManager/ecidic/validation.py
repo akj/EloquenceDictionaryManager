@@ -40,7 +40,7 @@ class ValidationCode(str, Enum):
 	VALUE_NUL = "valueNul"
 	MAIN_KEY_WHITESPACE = "mainKeyWhitespace"
 	MAIN_KEY_FINAL_PUNCTUATION = "mainKeyFinalPunctuation"
-	ROOT_KEY_NOT_LETTERS = "rootKeyNotLetters"
+	ROOT_KEY_INVALID = "rootKeyInvalid"
 	ROOT_VALUE_INVALID = "rootValueInvalid"
 	ABBREVIATION_KEY_INVALID = "abbreviationKeyInvalid"
 	ABBREVIATION_VALUE_INVALID = "abbreviationValueInvalid"
@@ -127,6 +127,15 @@ def _is_bare_spr(value: str) -> bool:
 	return closing == len(value) - 1 and value.find("`[", 2) == -1
 
 
+def _is_word_with_internal_apostrophes(word: str) -> bool:
+	"""Return whether *word* is letters, optionally joined by single apostrophes.
+
+	An apostrophe may not start or end the word, and two may not be adjacent.
+	"""
+
+	return all(part.isalpha() for part in word.split("'"))
+
+
 def _valid_abbreviation_key(key: str) -> bool:
 	if not key or not key[0].isalpha():
 		return False
@@ -135,11 +144,7 @@ def _valid_abbreviation_key(key: str) -> bool:
 	parts = key[:-1].split(".") if key.endswith(".") else key.split(".")
 	if not parts or any(not part for part in parts):
 		return False
-	for part in parts:
-		apostrophe_parts = part.split("'")
-		if any(not item or not item.isalpha() for item in apostrophe_parts):
-			return False
-	return True
+	return all(_is_word_with_internal_apostrophes(part) for part in parts)
 
 
 def _valid_abbreviation_value(value: str) -> bool:
@@ -169,12 +174,12 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 				_issue(ValidationCode.MAIN_KEY_FINAL_PUNCTUATION, Field.KEY, message),
 			)
 	elif slot is Slot.ROOT:
-		if not entry.key.isalpha():
+		if not _is_word_with_internal_apostrophes(entry.key):
 			message = _(
 				# Translators: Word-root validation error. {word} is the invalid word root.
-				'Word roots can contain only letters. "{word}" cannot be a word root — for words with digits or symbols, use an Exact word entry.',
+				'Word roots can contain only letters, with apostrophes inside the word. "{word}" cannot be a word root — for words with digits or symbols, use an Exact word entry.',
 			).format(word=entry.key)
-			issues.append(_issue(ValidationCode.ROOT_KEY_NOT_LETTERS, Field.KEY, message))
+			issues.append(_issue(ValidationCode.ROOT_KEY_INVALID, Field.KEY, message))
 		if not (entry.value.isalpha() or _is_bare_spr(entry.value)):
 			message = _(
 				# Translators: Word-root validation error describing the two permitted pronunciation forms.

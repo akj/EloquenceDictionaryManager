@@ -102,7 +102,7 @@ def _entry_rules() -> dict[Slot, str]:
 		),
 		Slot.ROOT: _(
 			# Translators: Rules shown for a word-root dictionary entry.
-			'Matches a word and all of its forms — "figure" also covers figures, figured, figuring — ignoring capitalization. Roots are stored in lowercase and can contain only letters. The pronunciation must be a single word or one phonetic string (`[...]).',
+			'Matches a word and all of its forms — "figure" also covers figures, figured, figuring — ignoring capitalization. Roots are stored in lowercase and can contain only letters, with apostrophes inside the word. The pronunciation must be a single word or one phonetic string (`[...]).',
 		),
 		Slot.ABBREVIATION: _(
 			# Translators: Rules shown for an abbreviation dictionary entry.
