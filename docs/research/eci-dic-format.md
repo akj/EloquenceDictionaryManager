@@ -338,7 +338,7 @@ expansion), explicitly *not* arbitrary substrings — `prego` won't fire inside
   forbid them. The IBMTTSDictionaries curator removed some duplicates from
   `ENURoot.dic` and `ENUmain.dic` upstream on 2026-11-07 (commit `a0a3e47`, after the
   v26.11 tag).
-- **Resolution is last-wins** **[engine]**. The manual never states this for file
+- **Resolution is last-wins.** The manual never states this for file
   loading, but it fits the engine's last-write-wins key store (`eciUpdateDict` *"is
   updated if the key already exists"*, tts.txt:3072–3075), and the IBMTTSDictionaries
   curator reports that the second occurrence is the one spoken
