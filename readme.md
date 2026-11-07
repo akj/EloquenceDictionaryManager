@@ -66,12 +66,14 @@ The entry dialog contains:
 - A **Type** group (Alt+T) with **Exact word**, **Word root (matches all word
   forms)**, and **Abbreviation**.
 - Read-only **Rules:** guidance (Alt+S) that changes with the selected Type.
-- **Play current** (Alt+C), which previews the Word as Eloquence currently
-  speaks it, and **Play new** (Alt+N), which previews the entered Pronunciation.
+- **Play current** (Alt+C), which previews the Word as the active synthesizer
+  currently speaks it, and **Play new** (Alt+N), which previews the entered
+  Pronunciation.
 
-Preview uses Eloquence directly. If Eloquence is not the active synthesizer,
-the buttons remain available but announce: "Preview unavailable: Eloquence is
-not the active synthesizer."
+Preview works when Eloquence or OpenEVV is the active synthesizer, because both
+read your dictionary entries. With any other synthesizer, the buttons remain
+available but announce: "Preview unavailable: switch to Eloquence or OpenEVV to
+hear pronunciations."
 
 Entries are checked before they are accepted:
 

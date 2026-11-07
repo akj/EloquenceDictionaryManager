@@ -460,14 +460,17 @@ runtime, because EDM may be disabled or removed.
 
 ### Preview
 
-Preview bypasses NVDA's speech-dictionary and symbol-processing pipeline. When
-Eloquence is active, both Play buttons call `speech.cancelSpeech()` and then
+Preview bypasses NVDA's speech-dictionary and symbol-processing pipeline. It
+runs only through synths that read EDM's managed sets and personal overlay:
+Eloquence (`eloquence`) and OpenEVV (`openevv`). When one of them is active,
+both Play buttons call `speech.cancelSpeech()` and then
 `synthDriverHandler.getSynth().speak()` with the relevant word.
 
-Play stays enabled and in the tab order when Eloquence is absent or not active.
-Activating it speaks the translatable explanation: "Preview unavailable:
-Eloquence is not the active synthesizer." EDM never previews through another
-synth and never switches synths temporarily.
+Play stays enabled and in the tab order when neither synth is active.
+Activating it speaks the translatable explanation: "Preview unavailable: switch
+to Eloquence or OpenEVV to hear pronunciations." It does not cancel speech
+first. EDM never previews through a synth that does not read its entries and
+never switches synths temporarily.
 
 ## Overlay export and import
 
