@@ -208,16 +208,18 @@ configuration also keeps secure or portable configurations isolated.
 ### Missing sets and consumer expectations
 
 If a selected Managed Dictionary Set is unavailable, the synth must not silently
-substitute another set. It retains the selected ID, loads no managed layer,
-continues applying the personal overlay when enabled, and reports the unavailable
+substitute another set. It retains the selected ID, leaves out only that set,
+keeps applying its other selected sets and the personal overlay when enabled,
+and reports the unavailable
 selection in its UI or diagnostic log. The set resumes automatically if the same
 ID returns. Engine pronunciation is the safety net.
 
 Synths do not bundle duplicate community sets. A synth may download a set for
 the user at runtime; that copy is the user's choice and is not covered by
 EDM's licensing or review. A downloaded copy uses the set's Managed Dictionary
-Set ID, the same provider layout, and the same consumer rules as an installed
-copy.
+Set ID and the same `.dic` file layout as an installed copy, and the synth
+treats it like an installed set once downloaded. EDM's redistribution
+requirements, such as license metadata in `set.ini`, do not apply to it.
 
 When an installed provider and a synth's own download both supply the same
 set ID, the synth shows one row for that set and uses the installed
