@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import string
 import unicodedata
 from dataclasses import dataclass
@@ -45,6 +46,8 @@ class ValidationCode(str, Enum):
 	ABBREVIATION_KEY_INVALID = "abbreviationKeyInvalid"
 	ABBREVIATION_VALUE_INVALID = "abbreviationValueInvalid"
 	UNENCODABLE_CHARACTER = "unencodableCharacter"
+	KEY_TOO_LONG = "keyTooLong"
+	VALUE_TOO_LONG = "valueTooLong"
 	SPR_UNCLOSED = "sprUnclosed"
 	SPR_EMPTY = "sprEmpty"
 	SPR_QUOTE_INVALID = "sprQuoteInvalid"
@@ -58,6 +61,31 @@ class ValidationIssue:
 	code: ValidationCode
 	field: Field
 	message: str
+
+
+class WarningCode(str, Enum):
+	"""Stable machine-readable identities for validation warnings."""
+
+	ABBREVIATION_KEY_NEVER_MATCHES = "abbreviationKeyNeverMatches"
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationWarning:
+	"""A problem with a valid entry: the engine loads it but never applies it."""
+
+	code: WarningCode
+	field: Field
+	message: str
+
+
+MAX_KEY_BYTES = 128
+"""The longest key, in bytes in the voice's code page, that Eloquence accepts."""
+
+MAX_VALUE_BYTES = 512
+"""The longest value, in bytes in the voice's code page, that Eloquence accepts."""
+
+# Engine tests on #173: these voices load an abbreviation key with a hyphen but never match it.
+_HYPHEN_ABBREVIATION_NEVER_MATCHES = frozenset({"enu", "eng"})
 
 
 class EntryValidationError(ValueError):
@@ -137,14 +165,14 @@ def _is_word_with_internal_apostrophes(word: str) -> bool:
 
 
 def _valid_abbreviation_key(key: str) -> bool:
-	if not key or not key[0].isalpha():
-		return False
-	if key.endswith("'") or "''" in key or ".." in key:
-		return False
-	parts = key[:-1].split(".") if key.endswith(".") else key.split(".")
-	if not parts or any(not part for part in parts):
-		return False
-	return all(_is_word_with_internal_apostrophes(part) for part in parts)
+	"""Return whether *key* is words joined by periods, with an optional trailing period.
+
+	Each word is letters with optional internal apostrophes. A hyphen is allowed
+	only straight after a joining period, as in "Dipl.-Ing.".
+	"""
+
+	body = key[:-1] if key.endswith(".") else key
+	return all(_is_word_with_internal_apostrophes(part) for part in re.split(r"\.-?", body))
 
 
 def _valid_abbreviation_value(value: str) -> bool:
@@ -190,7 +218,7 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 		if not _valid_abbreviation_key(entry.key):
 			message = _(
 				# Translators: Abbreviation validation error with examples of permitted keys.
-				'An abbreviation can contain only letters and periods, with apostrophes inside the word — for example "Dr." or "e.g.".',
+				'An abbreviation can contain only letters and periods, with apostrophes inside the word and hyphens straight after a period — for example "Dr.", "e.g." or "Dipl.-Ing.".',
 			)
 			issues.append(
 				_issue(ValidationCode.ABBREVIATION_KEY_INVALID, Field.KEY, message),
@@ -228,6 +256,37 @@ def _encoding_issues(entry: Entry, language: Language) -> list[ValidationIssue]:
 				'The character "{character}" cannot be saved in an Eloquence dictionary (Western encoding only).',
 			).format(character=character)
 			issues.append(_issue(ValidationCode.UNENCODABLE_CHARACTER, field, message))
+	return issues
+
+
+def _length_issues(entry: Entry, language: Language) -> list[ValidationIssue]:
+	"""Check the encoded length of each field; an unencodable field fails the encoding rule instead."""
+
+	issues: list[ValidationIssue] = []
+	for field, text, limit in (
+		(Field.KEY, entry.key, MAX_KEY_BYTES),
+		(Field.VALUE, entry.value, MAX_VALUE_BYTES),
+	):
+		try:
+			length = len(text.encode(language.encoding, errors="strict"))
+		except UnicodeEncodeError:
+			continue
+		if length <= limit:
+			continue
+		# Every v1 voice uses a single-byte code page, so bytes and characters are the same count.
+		if field is Field.KEY:
+			message = _(
+				# Translators: Validation error when the dictionary word is too long. {limit} is the maximum number of characters and {length} is the number entered.
+				"The word can be at most {limit} characters long, but it has {length}.",
+			).format(limit=limit, length=length)
+			code = ValidationCode.KEY_TOO_LONG
+		else:
+			message = _(
+				# Translators: Validation error when the pronunciation is too long. {limit} is the maximum number of characters and {length} is the number entered.
+				"The pronunciation can be at most {limit} characters long, but it has {length}.",
+			).format(limit=limit, length=length)
+			code = ValidationCode.VALUE_TOO_LONG
+		issues.append(_issue(code, field, message))
 	return issues
 
 
@@ -288,9 +347,44 @@ def validate_entry(
 	if not mechanically_invalid_fields:
 		issues.extend(_slot_issues(entry, slot_value))
 	issues.extend(_encoding_issues(entry, language_record))
+	issues.extend(_length_issues(entry, language_record))
 	if slot_value is not Slot.ABBREVIATION and Field.VALUE not in mechanically_invalid_fields:
 		issues.extend(_spr_issues(entry.value))
 	return tuple(issues)
+
+
+def entry_warnings(
+	entry: Entry,
+	slot: Slot | str,
+	language: Language | str,
+) -> tuple[ValidationWarning, ...]:
+	"""Return warnings for an entry that passes :func:`validate_entry`.
+
+	A warned entry is valid and the engine loads it, but never applies it. An
+	entry that fails validation has no warnings.
+	"""
+
+	slot_value = coerce_slot(slot)
+	language_record = get_language(language) if isinstance(language, str) else language
+	if validate_entry(entry, slot_value, language_record):
+		return ()
+	if (
+		slot_value is Slot.ABBREVIATION
+		and language_record.code in _HYPHEN_ABBREVIATION_NEVER_MATCHES
+		and "-" in entry.key
+	):
+		message = _(
+			# Translators: Abbreviation error for English voices, which load an abbreviation containing a hyphen but never use it.
+			"Eloquence would never use this entry, because English abbreviations with a hyphen never match. Use an Exact word entry instead.",
+		)
+		return (
+			ValidationWarning(
+				code=WarningCode.ABBREVIATION_KEY_NEVER_MATCHES,
+				field=Field.KEY,
+				message=message,
+			),
+		)
+	return ()
 
 
 def validate_or_raise(entry: Entry, slot: Slot | str, language: Language | str) -> None:

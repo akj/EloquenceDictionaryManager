@@ -51,7 +51,7 @@ from .ecidic.overlay import load_personal_overlay, save_personal_overlay
 from .ecidic.parsing import DictionaryEncodingError, key_identity
 from .ecidic.preview import can_preview
 from .ecidic.sets import ManagedSet, discover_managed_sets
-from .ecidic.validation import EntryValidationError, Field, normalize_entry, validate_entry
+from .ecidic.validation import EntryValidationError, Field, entry_warnings, normalize_entry, validate_entry
 from . import CONFIG_SECTION
 
 
@@ -106,7 +106,7 @@ def _entry_rules() -> dict[Slot, str]:
 		),
 		Slot.ABBREVIATION: _(
 			# Translators: Rules shown for an abbreviation dictionary entry.
-			'Matches an abbreviation written with letters and periods — capitalization counts. A trailing period is meaningful: "approx." matches only "approx.", while "approx" matches both "approx" and "approx.". The expansion must be plain words.',
+			'Matches an abbreviation written with letters and periods — capitalization counts. A trailing period is meaningful: "approx." matches only "approx.", while "approx" matches both "approx" and "approx.". A hyphen may follow a period, as in the German "Dipl.-Ing.", but English voices never match an abbreviation with a hyphen. The expansion must be plain words.',
 		),
 	}
 
@@ -272,7 +272,7 @@ class EntryDialog(wx.Dialog):
 			value=self._pronunciation_control.GetValue().strip(),
 		)
 		slot = self._selectedSlot()
-		issues = validate_entry(entry, slot, self._language)
+		issues = validate_entry(entry, slot, self._language) or entry_warnings(entry, slot, self._language)
 		if issues:
 			issue = issues[0]
 			wx.MessageBox(

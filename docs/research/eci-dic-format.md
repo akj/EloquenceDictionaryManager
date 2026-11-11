@@ -14,8 +14,15 @@ actually populate — is convention layered on top by the two driver/dictionary
 communities.
 
 Throughout, claims are tagged **[engine]** (enforced by `ECI.DLL`, per the manual or
-its API), or **[convention]** (a practice observed in driver code or data files, which
-the engine does not enforce). Confidence is flagged where evidence is thin.
+its API), **[engine-tested]** (observed by loading files into the engines), or
+**[convention]** (a practice observed in driver code or data files, which the engine
+does not enforce). Confidence is flagged where evidence is thin.
+
+The engine tests are tgeczy's, reported on
+[fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173#issuecomment-6731338267).
+They ran on three engines: the proprietary `ECI.DLL`, openevv (main@14c83573), and
+ReLoq C (release122@f11b0eef). Each test loads the files once at engine start and
+compares the audio for a word with the audio for its dictionary value spoken directly.
 
 ---
 
@@ -40,10 +47,10 @@ the engine does not enforce). Confidence is flagged where evidence is thin.
    assumes — is **unverified and probably untestable without an Asian engine build**.
 
 3. **Resolved: duplicate keys within one file resolve last-wins.** The manual never
-   states how `eciLoadDict` handles a key that appears twice, but the IBMTTSDictionaries
-   curator reports that the second occurrence controls pronunciation; see §7.
-   **Confidence: high.** For our own merge/dedup we control this ourselves and need not
-   rely on engine behaviour.
+   states how `eciLoadDict` handles a key that appears twice. Engine tests on the
+   proprietary engine, openevv, and ReLoq C show that the second occurrence wins in
+   main, root, and abbreviation files; see §7. For our own merge/dedup we control this
+   ourselves and need not rely on engine behaviour.
 
 4. **CP1252 vs ISO-8859-1 is a toolchain choice, not byte-provable.** The high bytes
    observed in Western files (0xE0, 0xEA, 0xFC …) are identical in CP1252 and
@@ -254,12 +261,17 @@ editor must *not* do; it also confirms CP1252 was the assumed Western on-disk en
   sentence-initial capitals. This is why root files are written all-lowercase.
 - **Key:** *a single word in ordinary spelling, all lowercase letters.* **NO** digits,
   punctuation, whitespace, or other non-letter characters (tts.txt:440–445).
-- **Exception: internal apostrophes work in practice.** **[convention]** The
-  IBMTTSDictionaries curators report that root keys such as `j'accuse` work in the
-  engine ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173)),
-  and the bundled `enuroot.dic` has 112 keys with an apostrophe (`j'accuse`,
-  `schoolma'am`). EDM accepts an apostrophe in a root key on the same terms as in an
-  abbreviation key: not first, not last, and not next to another apostrophe.
+- **Exception: internal apostrophes work.** **[engine-tested]** Root keys such as
+  `j'accuse` and `schoolma'am` apply on all three engines, as the IBMTTSDictionaries
+  curators reported. The bundled `enuroot.dic` has 112 keys with an apostrophe. EDM
+  accepts an apostrophe in a root key on the same terms as in an abbreviation key: not
+  first, not last, and not next to another apostrophe.
+- **openevv never matches accented root keys.** **[engine-tested]** On openevv, a
+  root key with an accented letter, such as `zórbex` or `risqué`, is never used; the
+  engine behaves as if it looks words up with the accents removed. The proprietary
+  engine and ReLoq C match these keys, and main keys are not affected. This is an
+  openevv bug ([Mudb0y/openevv#59](https://github.com/Mudb0y/openevv/issues/59)), so
+  validation does not reject or warn about these keys.
 - **Translation:** a single word in ordinary spelling **OR** a valid SPR. **NO**
   digits, punctuation, non-letter chars, whitespace, **tags, or annotations**
   (tts.txt:442–447). I.e. in roots, the value may be a bare respelled word or a
@@ -277,6 +289,22 @@ editor must *not* do; it also confirms CP1252 was the assumed Western on-disk en
   (`x.x.x.`, `xxx.`, `xxx`); upper/lower letters; **internal** apostrophes (not first/
   last). **NO** digits, non-letter symbols, whitespace, or punctuation other than
   periods (tts.txt:488–504).
+- **Hyphens, slashes, and ampersands.** **[engine-tested]** The manual allows none of
+  them, but the engines differ from the manual:
+  - German keys with a hyphen straight after a period, `Dipl.-Ing.` and `Dipl.-Kfm.`,
+    apply on all three engines. The German curator confirms these keys are valid, and
+    the bundled `deuabbr.dic` has three of them.
+  - US English keys with a hyphen, slash, or ampersand load on all three engines but
+    never match. Keys with periods work.
+  - British English and the other Western voices were not tested.
+
+  EDM accepts a hyphen only straight after a period that joins two words, which admits
+  every hyphenated key in the bundled data. It still rejects any other hyphen
+  (`Dipl-Ing.`, `Dipl.-`), slashes, and ampersands, as the manual does. For an `enu` or
+  `eng` key with an accepted hyphen, EDM reports the `abbreviationKeyNeverMatches`
+  warning (§11). The `eng` warning is an inference from the US English tests. The other
+  Western voices accept the hyphen with no warning, following the rule agreed on #173:
+  enforce only what the engine is confirmed to enforce.
 - **Trailing-period semantics** **[engine]** (tts.txt:463–480): key `inv` matches both
   `inv.` and `inv`; key `sid.` matches **only** `sid.` (not bare `sid`). So a trailing
   `.` in the key is meaningful, not decoration.
@@ -316,6 +344,10 @@ files. `eciSaveDict` (the engine's own writer) emits pure `key⇥value` lines *"
 particular order"* (tts.txt:2495–2497) — round-tripping through the engine would strip
 anything else anyway.
 
+**A blank line ends the file on the proprietary engine.** **[engine-tested]** The
+proprietary `ECI.DLL` stops reading at a blank line, so entries after it are ignored.
+openevv and ReLoq C skip the blank line and read on.
+
 Conclusion for our tools: **do not emit comments or blank lines**; if a comment feature
 is ever wanted, it must live in a sidecar file, not the `.dic`.
 
@@ -338,14 +370,16 @@ expansion), explicitly *not* arbitrary substrings — `prego` won't fire inside
   forbid them. The IBMTTSDictionaries curator removed some duplicates from
   `ENURoot.dic` and `ENUmain.dic` upstream on 2026-11-07 (commit `a0a3e47`, after the
   v26.11 tag).
-- **Resolution is last-wins.** The manual never states this for file
-  loading, but it fits the engine's last-write-wins key store (`eciUpdateDict` *"is
-  updated if the key already exists"*, tts.txt:3072–3075), and the IBMTTSDictionaries
-  curator reports that the second occurrence is the one spoken
-  ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173),
-  2026-11-07). Entries are stored "in no particular order" (tts.txt:2496), so file
-  order decides which occurrence wins at load time, not lookup order afterwards.
-  **Confidence: high** (curator listening report, not a test we ran).
+- **Resolution is last-wins.** **[engine-tested]** The manual never states this for
+  file loading, but on all three engines the second copy of a key wins, in main, root,
+  and abbreviation files. That fits the engine's last-write-wins key store
+  (`eciUpdateDict` *"is updated if the key already exists"*, tts.txt:3072–3075) and the
+  IBMTTSDictionaries curator's report. Entries are stored "in no particular order"
+  (tts.txt:2496), so file order decides which occurrence wins at load time, not lookup
+  order afterwards.
+
+**Main beats root.** **[engine-tested]** When a word is in both the main and the root
+file, the main entry wins on all three engines.
 
 **Implication for our merge/dedup:** don't depend on engine duplicate-handling.
 Deduplicate **before** writing the merged temp file — one entry per (slot, key), with
@@ -454,15 +488,25 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
 - **No documented length limit** on keys or translations. **[engine]** A search of the
   manual for maximum/limit/length near dictionary terms finds only
   `ECI_VOICE_NAME_LENGTH` (voice names, tts.txt:2724) — unrelated. Real entries are
-  short (words/short phrases); treat "no hard limit" as the working assumption but keep
-  entries reasonable.
+  short (words/short phrases).
+- **Agreed entry limits: 128 bytes per key, 512 bytes per value.** **[convention]**
+  The limits are measured after encoding in the voice's code page, which is Windows-1252
+  for every Western voice. They were agreed on #173, where the longest entry in the
+  community files has a 45-byte key and a 91-byte value. The Eloquence add-on rejects a
+  whole file that has an entry over either limit, so EDM's validator enforces them
+  (`keyTooLong`, `valueTooLong`).
+- **File size: ReLoq C refuses a main or root file over 8 MiB.** **[engine-tested]**
+  ReLoq C loads a main or root file of exactly 8,388,608 bytes. At one byte more, it
+  refuses the whole file and nothing from it loads. The proprietary engine and openevv
+  load a 12 MiB file.
 - **Forbidden by construction:**
   - **Tab** cannot appear inside a key or value (it *is* the separator). **[engine]**
   - **Newline** cannot appear inside an entry (one entry per line). **[engine]**
   - **Whitespace in a key:** forbidden in main, abbr, and roots. **[engine]**
   - **Key final character** must not be punctuation (main); abbr keys allow only
-    letters/periods/internal-apostrophe; roots keys allow only letters and internal
-    apostrophes (the apostrophe exception is **[convention]**, see §5).
+    letters, periods, internal apostrophes, and a hyphen straight after a period; roots
+    keys allow only letters and internal apostrophes (both exceptions to the manual are
+    **[engine-tested]**, see §5).
   - **NUL (0x00):** the engine takes NULL-terminated C strings (tts.txt:585–588), so an
     embedded NUL truncates — never allow it. **[engine, by API]**
   - **Bytes outside the active code page:** for Western that's non-CP1252 bytes; the
@@ -476,14 +520,18 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
 entries and whether each is valid. Any tool that validates Western `.dic` entries, such
 as a synth driver that checks dictionary files before loading them, can test against it
 without importing EDM. EDM's own test suite
-(`tests/test_entry_validation_examples.py`) checks every example against the editor's
-validator, so the file always matches what the editor accepts.
+(`tests/test_entry_validation_examples.py`) checks every example's result and warning
+against the editor's validator, so the file always matches it. The editor saves only
+entries that are valid and have no warning.
 
-The file is UTF-8 JSON with three top-level members:
+The file is UTF-8 JSON with four top-level members:
 
 - `about`: a one-paragraph description of the file.
 - `reasons`: an object that maps each rule identifier to a plain-language description
   of the rule. EDM's validator uses the same identifiers.
+- `warnings`: an object that maps each warning identifier to a plain-language
+  description of the warning. A warning marks a valid entry that the engine loads but
+  never applies, such as an English abbreviation key with a hyphen (§5).
 - `examples`: an array of objects with these members:
 
   | Member | Meaning |
@@ -493,6 +541,7 @@ The file is UTF-8 JSON with three top-level members:
   | `key` | The entry key |
   | `value` | The entry value |
   | `expected` | `valid`, or the identifier of the one rule the entry breaks |
+  | `warning` | Optional. On a `valid` example only, the identifier of the warning the entry carries |
   | `note` | Optional. Why the example matters |
 
 JSON string escapes carry the characters that a `.dic` line cannot hold: `\t` (tab),
@@ -506,7 +555,12 @@ To use the file from another project:
 2. For each example, validate the key and value for its voice and slot. Assert that
    valid examples pass and that invalid examples fail. If your validator reports
    reasons, map your reasons to the identifiers in `reasons` and assert the match.
-3. When the file changes upstream, copy the new version and fix any examples your
+3. If your validator reports warnings, assert that each example with a `warning`
+   produces that warning and that no other example produces one. A warned entry is
+   still valid: load it, and report it so the user knows it will never be used. A
+   consumer that ignores `warning` still passes every example, because `expected` is
+   `valid`. EDM's own editor goes further and refuses to save a warned entry.
+4. When the file changes upstream, copy the new version and fix any examples your
    validator now disagrees with. A change to this file is a change to the definition of
    a valid entry.
 
@@ -522,10 +576,12 @@ To use the file from another project:
    - *Roots:* key = letters with optional internal apostrophes, stored lowercase;
      value = a single bare word **or** one
      `` `[…] `` SPR — reject annotations, digits, punctuation, whitespace, multi-word.
-   - *Abbr:* key = letters + optional periods + internal apostrophe; value = plain
-     word(s) separated by space/hyphen — reject digits/punctuation/SPR/annotations.
+   - *Abbr:* key = letters + optional periods + internal apostrophe + a hyphen straight
+     after a period; value = plain word(s) separated by space/hyphen — reject
+     digits/punctuation/SPR/annotations.
 2. **Enforce the mechanical invariants**: exactly one TAB separator; no tab/newline/NUL
-   inside key or value; single-line entries. Offer to normalise line endings on save.
+   inside key or value; single-line entries; keys at most 128 bytes and values at most
+   512 bytes after encoding (§10). Offer to normalise line endings on save.
 3. **Encoding gate = CP1252 for Western** (§4). Reject or clearly warn on characters
    outside CP1252 rather than silently stripping accents like the old updater did — the
    whole point of the editor (spec §Entry editor) is to stop Notepad-style corruption.

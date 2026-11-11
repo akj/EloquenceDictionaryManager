@@ -210,8 +210,8 @@ def test_refresh_vendors_soft_invalid_lines_verbatim_with_a_warning(tmp_path: Pa
 	upstream_root = tmp_path / "upstream"
 	_ = _write_upstream_tree(upstream_root)
 	soft_invalid = (
-		# An entry the editor's abbreviation rules reject (hyphen in the key).
-		b"Dipl.-Ing.\tDiplomingenieur\r\n"
+		# An entry the editor's abbreviation rules reject (slash in the key).
+		b"km/h\tKilometer pro Stunde\r\n"
 		# Two entries accidentally joined on one line, as shipped by upstream.
 		+ b"ok\tokay\tok\tokay\r\n"
 		# A blank line.
@@ -226,8 +226,26 @@ def test_refresh_vendors_soft_invalid_lines_verbatim_with_a_warning(tmp_path: Pa
 	assert files["deuabbr.dic"] == soft_invalid
 	assert len(warnings) == 1
 	assert "DEUabbr.dic: 3 line(s) violate" in warnings[0]
-	assert "'Dipl.-Ing.'" in warnings[0]
+	assert "'km/h'" in warnings[0]
 	assert "exactly one tab" in warnings[0]
+
+
+def test_refresh_reports_entries_the_engine_never_uses_separately(tmp_path: Path) -> None:
+	lock_path = tmp_path / "dictionarySources.lock.ini"
+	_write_lock(lock_path)
+	upstream_root = tmp_path / "upstream"
+	_ = _write_upstream_tree(upstream_root)
+	never_used = b"Lt.-Col.\tlieutenant colonel\r\nDr.\tdoctor\r\n"
+	_ = (upstream_root / "ENUabbr.dic").write_bytes(never_used)
+	warnings: list[str] = []
+
+	files = process_upstream_tree(upstream_root, load_lock(lock_path).sets[SET_ID], warnings)
+
+	assert files["enuabbr.dic"] == never_used
+	assert warnings == [
+		"ENUabbr.dic: 1 line(s) are valid but have a validation warning; the engine loads them "
+		+ "but never uses them (line 1: 'Lt.-Col.': abbreviationKeyNeverMatches)",
+	]
 
 
 def test_refresh_rejects_an_upstream_tree_without_dictionaries(tmp_path: Path) -> None:

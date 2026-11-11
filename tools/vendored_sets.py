@@ -25,7 +25,13 @@ PACKAGE_PARENT = REPO_ROOT / "addon" / "globalPlugins" / "eloquenceDictionaryMan
 if str(PACKAGE_PARENT) not in sys.path:
 	sys.path.insert(0, str(PACKAGE_PARENT))
 
-from ecidic import DictionaryFilename, Entry, parse_dictionary_filename, validate_entry  # noqa: E402
+from ecidic import (  # noqa: E402
+	DictionaryFilename,
+	Entry,
+	entry_warnings,
+	parse_dictionary_filename,
+	validate_entry,
+)
 
 
 SET_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
@@ -229,6 +235,7 @@ def _validate_dictionary_bytes(name: str, data: bytes) -> list[str]:
 	filename, text = _decode_dictionary_bytes(name, data)
 	examples: list[str] = []
 	invalid_count = 0
+	never_used: list[str] = []
 
 	def note(line_number: int, message: str) -> None:
 		nonlocal invalid_count
@@ -247,15 +254,24 @@ def _validate_dictionary_bytes(name: str, data: bytes) -> list[str]:
 			note(line_number, "the line does not contain exactly one tab")
 			continue
 		key, value = line.split("\t")
-		issues = validate_entry(Entry(key=key, value=value), filename.slot, filename.language)
+		entry = Entry(key=key, value=value)
+		issues = validate_entry(entry, filename.slot, filename.language)
 		if issues:
 			note(line_number, f"{key!r}: {issues[0].message}")
-	if not invalid_count:
-		return []
-	return [
-		f"{name}: {invalid_count} line(s) violate the dictionary format or editor validation "
-		+ f"rules and will be ignored by the engine at lookup time ({'; '.join(examples)})",
-	]
+		elif warnings := entry_warnings(entry, filename.slot, filename.language):
+			never_used.append(f"line {line_number}: {key!r}: {warnings[0].code.value}")
+	messages: list[str] = []
+	if invalid_count:
+		messages.append(
+			f"{name}: {invalid_count} line(s) violate the dictionary format or editor validation "
+			+ f"rules and will be ignored by the engine at lookup time ({'; '.join(examples)})",
+		)
+	if never_used:
+		messages.append(
+			f"{name}: {len(never_used)} line(s) are valid but have a validation warning; the "
+			+ f"engine loads them but never uses them ({'; '.join(never_used[:3])})",
+		)
+	return messages
 
 
 def process_upstream_tree(
