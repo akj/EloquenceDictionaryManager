@@ -520,8 +520,9 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
 entries and whether each is valid. Any tool that validates Western `.dic` entries, such
 as a synth driver that checks dictionary files before loading them, can test against it
 without importing EDM. EDM's own test suite
-(`tests/test_entry_validation_examples.py`) checks every example against the editor's
-validator, so the file always matches what the editor accepts.
+(`tests/test_entry_validation_examples.py`) checks every example's result and warning
+against the editor's validator, so the file always matches it. The editor saves only
+entries that are valid and have no warning.
 
 The file is UTF-8 JSON with four top-level members:
 
