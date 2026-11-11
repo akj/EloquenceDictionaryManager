@@ -88,11 +88,13 @@ class EffectiveView:
 
 	def _build_rows(self, overlay: PersonalOverlay) -> tuple[EffectiveRow, ...]:
 		merged: dict[tuple[Slot, str], EffectiveRow] = {}
+		# The set's main rows, keyed by their word compared the way root keys compare.
+		managed_main_by_root: dict[str, EffectiveRow] = {}
 		if self.managed_set is not None:
 			for slot in Slot:
 				entries = deduplicate_entries(self.managed_set.entries_for(self.language, slot), slot)
 				for entry in entries:
-					merged[(slot, key_identity(entry.key, slot))] = EffectiveRow(
+					row = EffectiveRow(
 						word=entry.key,
 						pronunciation=entry.value,
 						slot=slot,
@@ -100,10 +102,15 @@ class EffectiveView:
 						managed_name=self.managed_set.name,
 						managed_version=self.managed_set.source_version,
 					)
+					merged[(slot, key_identity(entry.key, slot))] = row
+					if slot is Slot.MAIN:
+						managed_main_by_root[key_identity(entry.key, Slot.ROOT)] = row
 		for slot in Slot:
 			for entry in deduplicate_entries(overlay.entries_for(self.language, slot), slot):
 				identity = (slot, key_identity(entry.key, slot))
 				managed_row = merged.get(identity)
+				if managed_row is None and slot is Slot.ROOT:
+					managed_row = managed_main_by_root.get(identity[1])
 				if managed_row is None:
 					merged[identity] = EffectiveRow(
 						word=entry.key,
@@ -120,7 +127,20 @@ class EffectiveView:
 						managed_name=managed_row.managed_name,
 						managed_version=managed_row.managed_version,
 					)
-		return tuple(merged.values())
+		# Main beats root in the engine, so consumers drop a set's main entries for any word the
+		# overlay has in root. Those entries are never loaded, so they are not listed.
+		personal_roots = {
+			key_identity(entry.key, Slot.ROOT) for entry in overlay.entries_for(self.language, Slot.ROOT)
+		}
+		return tuple(
+			row
+			for row in merged.values()
+			if not (
+				row.kind is RowKind.MANAGED
+				and row.slot is Slot.MAIN
+				and key_identity(row.word, Slot.ROOT) in personal_roots
+			)
+		)
 
 	def rows(
 		self,

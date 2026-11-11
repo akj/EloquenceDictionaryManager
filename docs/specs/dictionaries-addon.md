@@ -65,8 +65,32 @@ set, whatever order the synth uses for them, and Managed overrides the engine
 baseline. An overlay entry replaces only the matching key;
 it never selects a whole replacement file. Root keys compare case-insensitively;
 main and abbreviation keys compare exactly. The ECI engine accepts one file per
-slot, so the consumer must realize this precedence before loading. The details
-of a particular driver's merge implementation are outside this spec.
+slot, so the consumer must realize this precedence before loading.
+
+Main and root entries also interact across slots. When a word has both a main
+entry and a root entry, the engine speaks it with the main entry, whatever
+order the files were stacked in. This holds on the proprietary `ECI.DLL`,
+openevv and ReLoq C
+([engine tests](https://github.com/fastfinge/eloquence_64/issues/173#issuecomment-6731338267)).
+Merging each slot separately would therefore let an earlier layer's main entry
+beat a later layer's root entry, and a personal root entry would lose to a
+set's main entry. A consumer applies this cross-type rule when it merges:
+
+- The layers are the Managed Dictionary Sets in the consumer's order, then the
+  Personal Dictionary Overlay.
+- When a later layer has a word in root, the consumer drops that word from
+  main in every earlier layer. It compares the words without case, the way
+  root keys compare, so a root entry for `foo` drops main entries for `foo`,
+  `Foo` and `FOO`.
+- A later layer's main entry already beats an earlier layer's root entry, so
+  that direction needs nothing.
+- Within one layer, whether one set or the overlay, nothing is dropped: both
+  entries are loaded and main beats root, as in the engine.
+
+Every contract version 1 consumer applies this rule, so each one reads the same
+overlay the same way. It changes nothing a provider ships, so it needs no new
+contract version. Other details of a particular driver's merge implementation
+are outside this spec.
 
 Managed files are never edited in place. Updating EDM replaces them wholesale,
 so upstream corrections and deletions propagate. The personal overlay survives
@@ -471,9 +495,19 @@ filter has **All**, **Personal**, **Overrides**, and **Managed** choices. Source
 values are `Managed — <name> (<version>)`, `Personal`, and `Personal — overrides
 <name>`.
 
+The list shows what a consumer will load, under the cross-type rule in
+[Dictionary architecture and precedence](#dictionary-architecture-and-precedence).
+A personal root entry overrides the viewed set's main entries for the same word,
+compared without case, as well as its root entry. Those main entries are not
+listed, and the personal root entry's Source is `Personal — overrides <name>`.
+Within the viewed set, or within the overlay, a main entry and a root entry for
+the same word are both listed.
+
 Editing a managed row is **Customize**: copy it into the overlay, then edit the
 copy. Removing an override restores the managed default immediately and without
-a separate confirmation; the row changes back to Managed under focus. Removing
+a separate confirmation; the row changes back to Managed under focus. When a
+personal root entry hid only the set's main entries, those entries are listed
+again and focus moves to the first of them. Removing
 a personal-only entry deletes it from the working copy. Managed entries cannot
 be deleted in v1 because the overlay has no tombstones.
 

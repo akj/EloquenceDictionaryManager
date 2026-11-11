@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import sys
 from types import ModuleType
+from typing import Any
 from unittest.mock import call, Mock
 
 import pytest
@@ -168,3 +169,83 @@ def test_entry_dialog_saves_a_german_abbreviation_with_a_hyphen(editor_module: M
 	editor_module.wx.MessageBox.assert_not_called()
 	dialog.EndModal.assert_called_once_with(5100)
 	assert dialog.entry == editor_module.Entry("Dipl.-Ing.", "Diplomingenieur")
+
+
+def _entries_dialog(editor_module: ModuleType, overlay: object, selected: int) -> Any:
+	Entry, Slot = editor_module.Entry, editor_module.Slot
+	managed_set = editor_module.ManagedSet(
+		id="github.example.set",
+		name="Example Set",
+		source_url="https://example.com/source",
+		source_version="v2",
+		source_revision="0123456789abcdef0123456789abcdef01234567",
+		attribution="Example contributors",
+		license="CC0-1.0",
+		license_url="https://example.com/license",
+		_entries={
+			("enu", Slot.MAIN): (
+				Entry("Apple", "apple"),
+				Entry("GUI", "gooey"),
+				Entry("Gui", "ghee"),
+				Entry("Zulu", "zulu"),
+			),
+		},
+	)
+	dialog_class = editor_module.EloquenceDictionariesDialog
+	dialog = dialog_class.__new__(dialog_class)
+	dialog._managed_sets = (managed_set,)
+	dialog._overlay = overlay
+	dialog._views = {}
+	dialog._rows = ()
+	dialog._language_codes = ("enu",)
+	dialog._show_filters = tuple(editor_module.ShowFilter)
+	dialog._slot_labels = editor_module._slot_labels()
+	dialog._language_choice = Mock()
+	dialog._language_choice.GetSelection.return_value = 0
+	dialog._set_choice = Mock()
+	dialog._set_choice.GetSelection.return_value = 0
+	dialog._filter_control = Mock()
+	dialog._filter_control.GetValue.return_value = ""
+	dialog._show_choice = Mock()
+	dialog._show_choice.GetSelection.return_value = 0
+	dialog._entry_list = Mock()
+	dialog._entry_list.GetFirstSelected.return_value = selected
+	dialog._remove_all_button = Mock()
+	dialog.Layout = Mock()
+	dialog._edit_button = Mock()
+	dialog._set_details_button = Mock()
+	dialog._remove_button = Mock()
+	dialog._refresh_rows()
+	return dialog
+
+
+def test_removing_a_root_override_focuses_the_restored_main_entry(editor_module: ModuleType) -> None:
+	Entry, Slot = editor_module.Entry, editor_module.Slot
+	overlay = sys.modules[f"{editor_module.__package__}.ecidic.overlay"].PersonalOverlay.from_entries(
+		[
+			("enu", Slot.MAIN, Entry("Aardvark", "personal")),
+			("enu", Slot.MAIN, Entry("Gui", "personal ghee")),
+			("enu", Slot.ROOT, Entry("gui", "gee you eye")),
+		],
+	)
+	dialog = _entries_dialog(editor_module, overlay, selected=3)
+	assert [(row.word, row.slot, row.kind.value) for row in dialog._rows] == [
+		("Aardvark", Slot.MAIN, "personal"),
+		("Apple", Slot.MAIN, "managed"),
+		("Gui", Slot.MAIN, "override"),
+		("gui", Slot.ROOT, "override"),
+		("Zulu", Slot.MAIN, "managed"),
+	]
+
+	dialog._onRemove(Mock())
+
+	assert [(row.word, row.slot, row.kind.value) for row in dialog._rows] == [
+		("Aardvark", Slot.MAIN, "personal"),
+		("Apple", Slot.MAIN, "managed"),
+		("GUI", Slot.MAIN, "managed"),
+		("Gui", Slot.MAIN, "override"),
+		("Zulu", Slot.MAIN, "managed"),
+	]
+	assert dialog._entry_list.Focus.call_args_list[-1] == call(2)
+	assert dialog._entry_list.Select.call_args_list[-1] == call(2)
+	dialog._entry_list.SetFocus.assert_called_once_with()

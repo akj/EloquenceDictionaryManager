@@ -57,9 +57,9 @@ def test_root_keys_override_case_insensitively_but_main_keys_are_exact() -> None
 		),
 	)
 
+	# The personal root entry also hides the set's main "Madrid".
 	rows = view.rows()
 	assert [(row.word, row.slot, row.kind) for row in rows] == [
-		("Madrid", Slot.MAIN, RowKind.MANAGED),
 		("madrid", Slot.MAIN, RowKind.PERSONAL),
 		("madrid", Slot.ROOT, RowKind.OVERRIDE),
 	]
@@ -170,3 +170,94 @@ def test_managed_internal_duplicate_keys_collapse_last_wins() -> None:
 	rows = EffectiveView("enu", managed, PersonalOverlay()).rows()
 
 	assert [(row.word, row.pronunciation) for row in rows] == [("duplicate", "last")]
+
+
+def test_personal_root_entry_hides_the_sets_main_entries_for_its_word() -> None:
+	managed = _managed_set(
+		{
+			("enu", Slot.MAIN): (
+				Entry("GUI", "gooey"),
+				Entry("Gui", "ghee"),
+				Entry("guide", "guide"),
+			),
+		},
+	)
+	view = EffectiveView("enu", managed, _overlay(("enu", Slot.ROOT, "gui", "gee you eye")))
+
+	assert [(row.word, row.pronunciation, row.slot, row.kind) for row in view.rows()] == [
+		("gui", "gee you eye", Slot.ROOT, RowKind.OVERRIDE),
+		("guide", "guide", Slot.MAIN, RowKind.MANAGED),
+	]
+	assert [row.source for row in view.rows(show=ShowFilter.OVERRIDES)] == [
+		"Personal — overrides Example Set",
+	]
+
+
+def test_removing_the_personal_root_entry_restores_the_sets_main_entries() -> None:
+	managed = _managed_set({("enu", Slot.MAIN): (Entry("GUI", "gooey"),)})
+	overlay = _overlay(("enu", Slot.ROOT, "gui", "gee you eye"))
+	assert [row.word for row in EffectiveView("enu", managed, overlay).rows()] == ["gui"]
+
+	overlay.remove_entry("enu", Slot.ROOT, "gui")
+
+	assert [(row.word, row.slot, row.kind) for row in EffectiveView("enu", managed, overlay).rows()] == [
+		("GUI", Slot.MAIN, RowKind.MANAGED),
+	]
+
+
+def test_personal_root_entry_overrides_the_sets_root_and_hides_its_main() -> None:
+	managed = _managed_set(
+		{
+			("enu", Slot.MAIN): (Entry("Wii", "wee main"),),
+			("enu", Slot.ROOT): (Entry("wii", "wee root"),),
+		},
+	)
+	view = EffectiveView("enu", managed, _overlay(("enu", Slot.ROOT, "wii", "personal")))
+
+	assert [(row.word, row.slot, row.kind) for row in view.rows()] == [
+		("wii", Slot.ROOT, RowKind.OVERRIDE),
+	]
+
+
+def test_main_and_root_within_one_layer_are_both_listed() -> None:
+	managed = _managed_set(
+		{
+			("enu", Slot.MAIN): (Entry("Sys", "managed main"),),
+			("enu", Slot.ROOT): (Entry("sys", "managed root"),),
+		},
+	)
+	view = EffectiveView(
+		"enu",
+		None,
+		_overlay(
+			("enu", Slot.MAIN, "Sys", "personal main"),
+			("enu", Slot.ROOT, "sys", "personal root"),
+		),
+	)
+	assert [(row.word, row.slot, row.kind) for row in view.rows()] == [
+		("Sys", Slot.MAIN, RowKind.PERSONAL),
+		("sys", Slot.ROOT, RowKind.PERSONAL),
+	]
+
+	managed_only = EffectiveView("enu", managed, PersonalOverlay())
+	assert [(row.word, row.slot, row.kind) for row in managed_only.rows()] == [
+		("Sys", Slot.MAIN, RowKind.MANAGED),
+		("sys", Slot.ROOT, RowKind.MANAGED),
+	]
+
+
+def test_personal_main_override_stays_listed_beside_a_personal_root_entry() -> None:
+	managed = _managed_set({("enu", Slot.MAIN): (Entry("Sys", "managed main"),)})
+	view = EffectiveView(
+		"enu",
+		managed,
+		_overlay(
+			("enu", Slot.MAIN, "Sys", "personal main"),
+			("enu", Slot.ROOT, "sys", "personal root"),
+		),
+	)
+
+	assert [(row.word, row.pronunciation, row.slot, row.kind) for row in view.rows()] == [
+		("Sys", "personal main", Slot.MAIN, RowKind.OVERRIDE),
+		("sys", "personal root", Slot.ROOT, RowKind.OVERRIDE),
+	]

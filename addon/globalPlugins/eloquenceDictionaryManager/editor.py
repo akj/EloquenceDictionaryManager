@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import date
+import itertools
 from pathlib import Path
 from typing import cast, override
 
@@ -939,10 +940,22 @@ class EloquenceDictionariesDialog(SettingsDialog):
 			if focus_target is not None:
 				target_word, target_slot = focus_target
 				target_identity = key_identity(target_word, target_slot)
-				for index, row in enumerate(self._rows):
-					if row.slot is target_slot and key_identity(row.word, row.slot) == target_identity:
-						target_index = index
-						break
+				matches = (
+					index
+					for index, row in enumerate(self._rows)
+					if row.slot is target_slot and key_identity(row.word, row.slot) == target_identity
+				)
+				if target_slot is Slot.ROOT:
+					# Removing a personal root entry restores the set's main entries for its word.
+					restored = (
+						index
+						for index, row in enumerate(self._rows)
+						if row.kind is RowKind.MANAGED
+						and row.slot is Slot.MAIN
+						and key_identity(row.word, Slot.ROOT) == target_identity
+					)
+					matches = itertools.chain(matches, restored)
+				target_index = next(matches, target_index)
 			self._entry_list.Select(target_index)
 			self._entry_list.Focus(target_index)
 		else:
