@@ -13,7 +13,7 @@
 		"mainKeyFinalPunctuation": "A main key ends with a punctuation character.",
 		"rootKeyInvalid": "A root key is not letters with optional internal apostrophes. An apostrophe may not be first, last, or next to another apostrophe.",
 		"rootValueInvalid": "A root value is not one word of letters or one bare SPR (`[...]).",
-		"abbreviationKeyInvalid": "An abbreviation key is not letters separated by single periods, with an optional trailing period and optional internal apostrophes. A hyphen is allowed only straight after a period that joins two words, as in Dipl.-Ing. Other hyphens and other punctuation are invalid.",
+		"abbreviationKeyInvalid": "An abbreviation key is not letters separated by single periods, with an optional trailing period and optional internal apostrophes. A hyphen is allowed straight after a period that joins two words, as in Dipl.-Ing. English (enu or eng) keys can also join two words with a hyphen, slash or ampersand, as in AT&T, but carry the abbreviationKeyNeverMatches warning. Other hyphens, slashes and ampersands, and other punctuation, are invalid.",
 		"abbreviationValueInvalid": "An abbreviation value is not words of letters separated by single spaces or hyphens.",
 		"unencodableCharacter": "The key or value contains a character the voice's code page cannot encode. All Western voices use Windows-1252.",
 		"keyTooLong": "The key is longer than 128 bytes after encoding in the voice's code page. Eloquence rejects a whole file that contains such an entry.",
@@ -24,7 +24,7 @@
 		"sprPrimaryStressRequired": "An SPR with more than one syllable has no primary stress marker 1."
 	},
 	"warnings": {
-		"abbreviationKeyNeverMatches": "An English (enu or eng) abbreviation key contains a hyphen. The engine loads the entry but never matches it, so the entry is never used."
+		"abbreviationKeyNeverMatches": "An English (enu or eng) abbreviation key contains a hyphen, slash or ampersand. The engine loads the entry but never matches it, so the entry is never used."
 	},
 	"examples": [
 		{"voice": "enu", "slot": "main", "key": "", "value": "word", "expected": "emptyKey"},
@@ -73,11 +73,16 @@
 		{"voice": "enu", "slot": "abbr", "key": "WWII's", "value": "world war twos", "expected": "valid"},
 		{"voice": "enu", "slot": "abbr", "key": "Ltjg", "value": "lieutenant junior-grade", "expected": "valid"},
 		{"voice": "deu", "slot": "abbr", "key": "Dipl.-Ing.", "value": "Diplomingenieur", "expected": "valid", "note": "A hyphen straight after a period is valid. The German curators and engine tests confirm that these keys work."},
-		{"voice": "enu", "slot": "abbr", "key": "Lt.-Col.", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "Engine tests show that US English loads abbreviation keys with a hyphen but never matches them."},
+		{"voice": "enu", "slot": "abbr", "key": "Lt.-Col.", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "Engine tests show that US English loads abbreviation keys with a hyphen, slash or ampersand but never matches them."},
 		{"voice": "eng", "slot": "abbr", "key": "Lt.-Col.", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "Inferred from the US English tests. British English was not tested."},
+		{"voice": "enu", "slot": "abbr", "key": "Lt-Col", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "In English, a hyphen can join two words without a period."},
+		{"voice": "enu", "slot": "abbr", "key": "km/h", "value": "kilometers per hour", "expected": "valid", "warning": "abbreviationKeyNeverMatches"},
+		{"voice": "enu", "slot": "abbr", "key": "AT&T", "value": "A T and T", "expected": "valid", "warning": "abbreviationKeyNeverMatches"},
+		{"voice": "enu", "slot": "abbr", "key": "&T", "value": "and T", "expected": "abbreviationKeyInvalid", "note": "In English, a hyphen, slash or ampersand must join two words."},
+		{"voice": "enu", "slot": "abbr", "key": "A--B", "value": "A B", "expected": "abbreviationKeyInvalid"},
 		{"voice": "deu", "slot": "abbr", "key": "Dipl-Ing.", "value": "Diplomingenieur", "expected": "abbreviationKeyInvalid", "note": "A hyphen that does not follow a period is invalid."},
 		{"voice": "deu", "slot": "abbr", "key": "Dipl.-", "value": "Diplom", "expected": "abbreviationKeyInvalid", "note": "A hyphen must be followed by a letter."},
-		{"voice": "deu", "slot": "abbr", "key": "km/h", "value": "Kilometer pro Stunde", "expected": "abbreviationKeyInvalid", "note": "Slashes and ampersands are invalid. English engines load them but never match them."},
+		{"voice": "deu", "slot": "abbr", "key": "km/h", "value": "Kilometer pro Stunde", "expected": "abbreviationKeyInvalid", "note": "Outside English, slashes and ampersands are invalid. Only German hyphens straight after a period were tested."},
 		{"voice": "enu", "slot": "abbr", "key": ".Dr", "value": "doctor", "expected": "abbreviationKeyInvalid"},
 		{"voice": "enu", "slot": "abbr", "key": "Dr..", "value": "doctor", "expected": "abbreviationKeyInvalid"},
 		{"voice": "enu", "slot": "abbr", "key": "'Dr", "value": "doctor", "expected": "abbreviationKeyInvalid"},

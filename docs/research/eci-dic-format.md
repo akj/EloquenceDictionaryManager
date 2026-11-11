@@ -298,13 +298,17 @@ editor must *not* do; it also confirms CP1252 was the assumed Western on-disk en
     never match. Keys with periods work.
   - British English and the other Western voices were not tested.
 
-  EDM accepts a hyphen only straight after a period that joins two words, which admits
-  every hyphenated key in the bundled data. It still rejects any other hyphen
-  (`Dipl-Ing.`, `Dipl.-`), slashes, and ampersands, as the manual does. For an `enu` or
-  `eng` key with an accepted hyphen, EDM reports the `abbreviationKeyNeverMatches`
-  warning (§11). The `eng` warning is an inference from the US English tests. The other
-  Western voices accept the hyphen with no warning, following the rule agreed on #173:
-  enforce only what the engine is confirmed to enforce.
+  EDM accepts a hyphen straight after a period that joins two words, which admits
+  every hyphenated key in the bundled data. For `enu` and `eng` keys, EDM also accepts
+  a hyphen, slash, or ampersand that joins two words in place of a period (`Lt-Col`,
+  `km/h`, `AT&T`), because the engine loads them, and reports every `enu` or `eng` key
+  with a hyphen, slash, or ampersand with the `abbreviationKeyNeverMatches` warning
+  (§11). The `eng` behaviour is an inference from the US English tests. A hyphen, slash,
+  or ampersand that does not join two words (`&T`, `A--B`, `Dr.-`) is invalid in every
+  voice. The other Western voices accept the hyphen after a period with no warning, and
+  still reject any other hyphen (`Dipl-Ing.`), slashes, and ampersands, as the manual
+  does: only German hyphens were tested. This follows the rule agreed on #173: enforce
+  only what the engine is confirmed to enforce.
 - **Trailing-period semantics** **[engine]** (tts.txt:463–480): key `inv` matches both
   `inv.` and `inv`; key `sid.` matches **only** `sid.` (not bare `sid`). So a trailing
   `.` in the key is meaningful, not decoration.
@@ -504,8 +508,9 @@ or bare word** only (no `` `N `` emphasis, no multi-word). Abbr ⇒ **plain word
   - **Newline** cannot appear inside an entry (one entry per line). **[engine]**
   - **Whitespace in a key:** forbidden in main, abbr, and roots. **[engine]**
   - **Key final character** must not be punctuation (main); abbr keys allow only
-    letters, periods, internal apostrophes, and a hyphen straight after a period; roots
-    keys allow only letters and internal apostrophes (both exceptions to the manual are
+    letters, periods, internal apostrophes, and a hyphen straight after a period, and
+    English abbr keys also a hyphen, slash, or ampersand between words; roots keys allow
+    only letters and internal apostrophes (these exceptions to the manual are
     **[engine-tested]**, see §5).
   - **NUL (0x00):** the engine takes NULL-terminated C strings (tts.txt:585–588), so an
     embedded NUL truncates — never allow it. **[engine, by API]**
@@ -531,7 +536,8 @@ The file is UTF-8 JSON with four top-level members:
   of the rule. EDM's validator uses the same identifiers.
 - `warnings`: an object that maps each warning identifier to a plain-language
   description of the warning. A warning marks a valid entry that the engine loads but
-  never applies, such as an English abbreviation key with a hyphen (§5).
+  never applies, such as an English abbreviation key with a hyphen, slash, or ampersand
+  (§5).
 - `examples`: an array of objects with these members:
 
   | Member | Meaning |
@@ -577,7 +583,8 @@ To use the file from another project:
      value = a single bare word **or** one
      `` `[…] `` SPR — reject annotations, digits, punctuation, whitespace, multi-word.
    - *Abbr:* key = letters + optional periods + internal apostrophe + a hyphen straight
-     after a period; value = plain word(s) separated by space/hyphen — reject
+     after a period (English: also a hyphen, slash, or ampersand between words, with a
+     warning); value = plain word(s) separated by space/hyphen — reject
      digits/punctuation/SPR/annotations.
 2. **Enforce the mechanical invariants**: exactly one TAB separator; no tab/newline/NUL
    inside key or value; single-line entries; keys at most 128 bytes and values at most

@@ -531,8 +531,10 @@ The minimum validation contract is:
   internal apostrophes, plus a hyphen straight after a period that joins two
   words (`Dipl.-Ing.`); values contain plain words separated by spaces or
   hyphens, with no SPR or annotation. The manual allows no hyphen, but the
-  German curators and engine tests on #173 confirm that these keys work. Other
-  hyphens, slashes, and ampersands stay invalid; and
+  German curators and engine tests on #173 confirm that these keys work. English
+  (`enu` and `eng`) keys can also join two words with a hyphen, slash, or
+  ampersand (`AT&T`, `km/h`), because the engine loads them; they carry the
+  warning below. Other hyphens, slashes, and ampersands stay invalid; and
 - SPR structure is validated. Per-language phoneme-symbol legality (for
   example, rejecting lowercase `j` in American English) is planned follow-up
   work using the manual's SPR tables
@@ -541,7 +543,8 @@ The minimum validation contract is:
 
 A **warning** marks an entry that is valid and loads, but that the engine never
 applies. The one warning today is an English (`enu` or `eng`) abbreviation key
-with a hyphen: engine tests show US English loads it but never matches it, and
+with a hyphen, slash, or ampersand: engine tests show US English loads it but
+never matches it, and
 British English is assumed to behave the same. The entry dialog does not save a
 warned entry: it shows the warning as it would a failure and returns focus to
 the Word field. Import and migration skip a warned entry as they skip an

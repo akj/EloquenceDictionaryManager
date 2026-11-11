@@ -150,8 +150,8 @@ def test_entry_dialog_refuses_an_entry_eloquence_would_never_use(editor_module: 
 	editor_module.EntryDialog.onOk(dialog, Mock())
 
 	editor_module.wx.MessageBox.assert_called_once_with(
-		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
-		+ "Use an Exact word entry instead.",
+		"Eloquence would never use this entry, because English abbreviations with a hyphen, slash "
+		+ "or ampersand never match. Use an Exact word entry instead.",
 		"Dictionary Entry Error",
 		4 | 256,
 		dialog,

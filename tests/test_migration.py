@@ -283,8 +283,8 @@ def test_entries_eloquence_would_never_use_are_shown_as_invalid_and_cannot_be_ch
 		(MigrationCandidateStatus.INVALID, False, False),
 	]
 	assert rows[0].status_text == (
-		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
-		+ "Use an Exact word entry instead."
+		"Eloquence would never use this entry, because English abbreviations with a hyphen, slash "
+		+ "or ampersand never match. Use an Exact word entry instead."
 	)
 
 
