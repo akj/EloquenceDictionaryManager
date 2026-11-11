@@ -79,17 +79,22 @@ Entries are checked before they are accepted:
 
 - Both Word and Pronunciation must contain text. Tabs, line breaks, and NUL
   characters are not allowed. Characters that the selected language cannot
-  encode are rejected.
+  encode are rejected. A Word can be at most 128 characters long and a
+  Pronunciation at most 512, because the Eloquence add-on rejects a whole
+  dictionary file that has a longer entry.
 - **Exact word** entries cannot contain spaces or end with punctuation.
   Capitalization matters. Pronunciations may use ordinary text, Eloquence
   phonetic strings, and emphasis codes.
-- **Word root** entries contain letters only, are stored in lowercase, and
-  ignore capitalization when matching. A pronunciation must be one bare word
-  or one phonetic string, not an annotation or multiple words.
+- **Word root** entries contain letters, with apostrophes allowed inside the
+  word, such as "j'accuse". They are stored in lowercase and ignore
+  capitalization when matching. A pronunciation must be one bare word or one
+  phonetic string, not an annotation or multiple words.
 - **Abbreviation** entries use letters, meaningful periods, and permitted
-  internal apostrophes. Capitalization matters. The expansion must contain
-  plain words separated by spaces or hyphens, without phonetic strings or
-  annotations.
+  internal apostrophes. A hyphen may follow a period, as in the German
+  "Dipl.-Ing.". Capitalization matters. The expansion must contain plain words
+  separated by spaces or hyphens, without phonetic strings or annotations.
+- Eloquence never uses an English abbreviation that contains a hyphen, so
+  these entries are not accepted. Use an **Exact word** entry instead.
 
 Choose **Remove** to delete a personal-only entry. Removing a personal override
 immediately restores the managed pronunciation. Managed entries themselves

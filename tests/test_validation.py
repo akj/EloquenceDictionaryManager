@@ -9,6 +9,8 @@ from ecidic import (
 	Field,
 	Slot,
 	ValidationCode,
+	WarningCode,
+	entry_warnings,
 	serialize_dictionary_bytes,
 	validate_entry,
 	validate_or_raise,
@@ -97,7 +99,24 @@ def test_word_root_rejects_apostrophes_at_the_edges_doubled_or_other_punctuation
 
 @pytest.mark.parametrize(
 	"key",
-	[".Dr", "Dr..", "Dr'", "'Dr", "D''r", "Dr!", "D2", "two words", "Dipl.-Ing."],
+	[
+		".Dr",
+		"Dr..",
+		"Dr'",
+		"'Dr",
+		"D''r",
+		"Dr!",
+		"D2",
+		"two words",
+		"Dipl-Ing.",
+		"-Dipl.",
+		"Dipl.-",
+		"Dipl.--Ing.",
+		"Dipl.-.Ing.",
+		"Dipl.-'Ing.",
+		"km/h",
+		"A&B",
+	],
 )
 def test_abbreviation_key_validation_catalog(key: str) -> None:
 	assert codes(Entry(key, "doctor"), Slot.ABBREVIATION) == [
@@ -115,9 +134,75 @@ def test_abbreviation_value_validation_catalog(value: str) -> None:
 	]
 
 
-@pytest.mark.parametrize("key", ["Dr.", "e.g.", "approx", "O'Neill"])
+@pytest.mark.parametrize("key", ["Dr.", "e.g.", "approx", "O'Neill", "Dipl.-Ing.", "Dipl.-Psych", "u.-s.-w."])
 def test_valid_abbreviation_key_forms(key: str) -> None:
 	assert validate_entry(Entry(key, "plain words-separated"), Slot.ABBREVIATION, "enu") == ()
+
+
+@pytest.mark.parametrize("language", ["deu", "fra", "esp"])
+def test_hyphenated_abbreviation_keys_have_no_warning_outside_english(language: str) -> None:
+	entry = Entry("Dipl.-Ing.", "Diplomingenieur")
+
+	assert validate_entry(entry, Slot.ABBREVIATION, language) == ()
+	assert entry_warnings(entry, Slot.ABBREVIATION, language) == ()
+
+
+@pytest.mark.parametrize("language", ["enu", "eng"])
+def test_english_hyphenated_abbreviation_keys_are_valid_but_warned(language: str) -> None:
+	entry = Entry("Lt.-Col.", "lieutenant colonel")
+
+	warnings = entry_warnings(entry, Slot.ABBREVIATION, language)
+
+	assert validate_entry(entry, Slot.ABBREVIATION, language) == ()
+	assert [(warning.code, warning.field) for warning in warnings] == [
+		(WarningCode.ABBREVIATION_KEY_NEVER_MATCHES, Field.KEY),
+	]
+	assert warnings[0].message == (
+		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
+		+ "Use an Exact word entry instead."
+	)
+	validate_or_raise(entry, Slot.ABBREVIATION, language)
+
+
+def test_entries_that_fail_validation_have_no_warnings() -> None:
+	entry = Entry("Lt.-Col.", "two  words")
+
+	assert codes(entry, Slot.ABBREVIATION) == [ValidationCode.ABBREVIATION_VALUE_INVALID]
+	assert entry_warnings(entry, Slot.ABBREVIATION, "enu") == ()
+
+
+@pytest.mark.parametrize(
+	("entry", "expected"),
+	[
+		(Entry("a" * 128, "word"), []),
+		(Entry("a" * 129, "word"), [ValidationCode.KEY_TOO_LONG]),
+		(Entry("word", "a" * 512), []),
+		(Entry("word", "a" * 513), [ValidationCode.VALUE_TOO_LONG]),
+		(Entry("é" * 128, "word"), []),
+		(Entry("é" * 129, "word"), [ValidationCode.KEY_TOO_LONG]),
+		(Entry("漢" + "a" * 128, "word"), [ValidationCode.UNENCODABLE_CHARACTER]),
+		(Entry("word", "漢" + "a" * 512), [ValidationCode.UNENCODABLE_CHARACTER]),
+	],
+)
+def test_length_limits_count_encoded_bytes(entry: Entry, expected: list[ValidationCode]) -> None:
+	assert codes(entry) == expected
+
+
+def test_length_limit_messages_name_the_limit_and_the_length() -> None:
+	issues = validate_entry(Entry("a" * 130, "a" * 600), Slot.MAIN, "enu")
+
+	assert [(issue.code, issue.field, issue.message) for issue in issues] == [
+		(
+			ValidationCode.KEY_TOO_LONG,
+			Field.KEY,
+			"The word can be at most 128 characters long, but it has 130.",
+		),
+		(
+			ValidationCode.VALUE_TOO_LONG,
+			Field.VALUE,
+			"The pronunciation can be at most 512 characters long, but it has 600.",
+		),
+	]
 
 
 @pytest.mark.parametrize(

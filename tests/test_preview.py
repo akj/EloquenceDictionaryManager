@@ -129,3 +129,42 @@ def test_preview_cancels_speech_before_speaking_with_previewing_synth(
 		call.speak(["test pronunciation"]),
 	]
 	editor_module.ui.message.assert_not_called()
+
+
+def _entry_dialog(editor_module: ModuleType, language: str, word: str, pronunciation: str) -> Mock:
+	editor_module.wx.MessageBox = Mock()
+	editor_module.wx.OK = 4
+	editor_module.wx.ICON_WARNING = 256
+	editor_module.wx.ID_OK = 5100
+	dialog = Mock()
+	dialog._language = language
+	dialog._word_control.GetValue.return_value = word
+	dialog._pronunciation_control.GetValue.return_value = pronunciation
+	dialog._selectedSlot.return_value = editor_module.Slot.ABBREVIATION
+	return dialog
+
+
+def test_entry_dialog_refuses_an_entry_eloquence_would_never_use(editor_module: ModuleType) -> None:
+	dialog = _entry_dialog(editor_module, "enu", "Lt.-Col.", "lieutenant colonel")
+
+	editor_module.EntryDialog.onOk(dialog, Mock())
+
+	editor_module.wx.MessageBox.assert_called_once_with(
+		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
+		+ "Use an Exact word entry instead.",
+		"Dictionary Entry Error",
+		4 | 256,
+		dialog,
+	)
+	dialog._word_control.SetFocus.assert_called_once_with()
+	dialog.EndModal.assert_not_called()
+
+
+def test_entry_dialog_saves_a_german_abbreviation_with_a_hyphen(editor_module: ModuleType) -> None:
+	dialog = _entry_dialog(editor_module, "deu", "Dipl.-Ing.", "Diplomingenieur")
+
+	editor_module.EntryDialog.onOk(dialog, Mock())
+
+	editor_module.wx.MessageBox.assert_not_called()
+	dialog.EndModal.assert_called_once_with(5100)
+	assert dialog.entry == editor_module.Entry("Dipl.-Ing.", "Diplomingenieur")

@@ -390,3 +390,21 @@ def test_invalid_editor_entries_are_skipped_and_counted() -> None:
 	assert result.imported == 1
 	assert target.get_entry("enu", Slot.MAIN, "two words") is None
 	assert target.get_entry("enu", Slot.MAIN, "valid") == Entry("valid", "pronunciation")
+
+
+def test_entries_eloquence_would_never_use_are_skipped_like_invalid_entries() -> None:
+	data = _build_artifact(
+		{
+			MANIFEST_FILENAME: _manifest_bytes(),
+			"enuabbr.dic": b"Lt.-Col.\tlieutenant colonel\r\nDr.\tdoctor\r\n",
+		},
+	)
+	artifact = read_edm_dict_artifact(data)
+	target = PersonalOverlay()
+
+	plan = build_import_plan(artifact, target)
+	result = apply_import_plan(target, plan)
+
+	assert (result.imported, result.skipped_invalid) == (1, 1)
+	assert target.get_entry("enu", Slot.ABBREVIATION, "Lt.-Col.") is None
+	assert target.get_entry("enu", Slot.ABBREVIATION, "Dr.") == Entry("Dr.", "doctor")

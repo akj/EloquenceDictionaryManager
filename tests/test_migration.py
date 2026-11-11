@@ -274,6 +274,20 @@ def test_classification_covers_remaining_statuses_and_omits_personal_and_upstrea
 	assert rows[2].status_text == "Differs from your current entry for this word"
 
 
+def test_entries_eloquence_would_never_use_are_shown_as_invalid_and_cannot_be_checked() -> None:
+	candidate = _candidate("Lt.-Col.", "lieutenant colonel", slot=Slot.ABBREVIATION)
+
+	rows = classify_migration_candidates((candidate,), PersonalOverlay(), _HistoricalUnionStub())
+
+	assert [(row.status, row.checked_by_default, row.checkable) for row in rows] == [
+		(MigrationCandidateStatus.INVALID, False, False),
+	]
+	assert rows[0].status_text == (
+		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
+		+ "Use an Exact word entry instead."
+	)
+
+
 def test_historical_union_match_is_omitted_from_candidate_rows() -> None:
 	candidate = _candidate("upstream", "known")
 	historical = _HistoricalUnionStub({("enu", Slot.MAIN, "upstream", "known")})

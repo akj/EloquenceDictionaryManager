@@ -515,6 +515,11 @@ The minimum validation contract is:
 
 - every entry is one nonempty key and value; tab, newline, and NUL are forbidden
   inside either field;
+- a key is at most 128 bytes and a value at most 512 bytes, measured after
+  encoding in the language's code page. These limits were agreed with the
+  Eloquence add-on
+  ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173)),
+  which rejects a whole file that has an entry over them;
 - **Exact word** keys contain no whitespace and do not end in punctuation;
   values may contain ordinary text, SPRs, and annotations;
 - **Word root** keys contain letters, with apostrophes allowed inside the word
@@ -523,24 +528,32 @@ The minimum validation contract is:
   but the IBMTTSDictionaries curators report that apostrophe keys work, and the
   bundled set relies on them;
 - **Abbreviation** keys contain letters, meaningful periods, and permitted
-  internal apostrophes only; values contain plain words separated by spaces or
-  hyphens, with no SPR or annotation; and
+  internal apostrophes, plus a hyphen straight after a period that joins two
+  words (`Dipl.-Ing.`); values contain plain words separated by spaces or
+  hyphens, with no SPR or annotation. The manual allows no hyphen, but the
+  German curators and engine tests on #173 confirm that these keys work. Other
+  hyphens, slashes, and ampersands stay invalid; and
 - SPR structure is validated. Per-language phoneme-symbol legality (for
   example, rejecting lowercase `j` in American English) is planned follow-up
   work using the manual's SPR tables
   ([#64](https://github.com/akj/EloquenceDictionaryManager/issues/64)), and
   does not block consumer integration.
 
-Hyphens in abbreviation keys (`Dipl.-Ing.`) stay invalid until engine tests or
-the German curators confirm they work.
+A **warning** marks an entry that is valid and loads, but that the engine never
+applies. The one warning today is an English (`enu` or `eng`) abbreviation key
+with a hyphen: engine tests show US English loads it but never matches it, and
+British English is assumed to behave the same. The entry dialog does not save a
+warned entry: it shows the warning as it would a failure and returns focus to
+the Word field. Import and migration skip a warned entry as they skip an
+invalid one.
 
 The exact user-facing validation catalog and Rules copy are frozen by the
 prototype walkthrough; the engine rationale and edge cases are in
 [ECI `.dic` format](../research/eci-dic-format.md).
 
 Synths that validate dictionary files share this definition of a valid entry
-through the format document and a shared set of example valid and invalid
-lines that each validator tests against
+through the format document and a shared set of example valid, invalid, and
+warned lines that each validator tests against
 ([#63](https://github.com/akj/EloquenceDictionaryManager/issues/63)). They do not import EDM's code at
 runtime, because EDM may be disabled or removed.
 

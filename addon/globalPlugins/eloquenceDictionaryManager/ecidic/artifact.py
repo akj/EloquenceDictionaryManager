@@ -23,7 +23,13 @@ from .parsing import (
 	parse_dictionary_bytes,
 	serialize_dictionary_bytes,
 )
-from .validation import EntryValidationError, ValidationCode, normalize_entry, validate_entry
+from .validation import (
+	EntryValidationError,
+	ValidationCode,
+	entry_warnings,
+	normalize_entry,
+	validate_entry,
+)
 
 try:
 	import addonHandler
@@ -310,7 +316,11 @@ def build_import_plan(artifact: EdmDictArtifact, overlay: PersonalOverlay) -> Im
 	skipped_invalid = 0
 	for dictionary in artifact.dictionaries:
 		for entry in dictionary.entries:
-			if validate_entry(entry, dictionary.slot, dictionary.language):
+			if validate_entry(entry, dictionary.slot, dictionary.language) or entry_warnings(
+				entry,
+				dictionary.slot,
+				dictionary.language,
+			):
 				skipped_invalid += 1
 				continue
 			normalized_entry = normalize_entry(entry, dictionary.slot)

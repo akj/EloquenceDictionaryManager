@@ -19,7 +19,7 @@ from .parsing import (
 	parse_dictionary_bytes,
 	parse_dictionary_filename,
 )
-from .validation import EntryValidationError, normalize_entry, validate_entry
+from .validation import EntryValidationError, entry_warnings, normalize_entry, validate_entry
 
 try:
 	import addonHandler
@@ -243,7 +243,11 @@ def classify_migration_candidates(
 		# write, so an equal value is already the same effective personal entry.
 		if existing is not None and existing.value == candidate.entry.value:
 			continue
-		issues = validate_entry(candidate.entry, candidate.slot, candidate.language)
+		issues = validate_entry(candidate.entry, candidate.slot, candidate.language) or entry_warnings(
+			candidate.entry,
+			candidate.slot,
+			candidate.language,
+		)
 		if issues:
 			status = MigrationCandidateStatus.INVALID
 			status_text = issues[0].message

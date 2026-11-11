@@ -1,5 +1,5 @@
 {
-	"about": "Example Western ECI dictionary entries and whether each is valid. Each example gives an ECI voice code, a slot (main, root or abbr, as in the <voice><slot>.dic filename), a key, a value, and the expected result: \"valid\", or the identifier of the one rule the entry breaks. Identifiers are explained under \"reasons\". Format and usage: docs/research/eci-dic-format.md, section 11.",
+	"about": "Example Western ECI dictionary entries and whether each is valid. Each example gives an ECI voice code, a slot (main, root or abbr, as in the <voice><slot>.dic filename), a key, a value, and the expected result: \"valid\", or the identifier of the one rule the entry breaks. Identifiers are explained under \"reasons\". A valid example can also name a \"warning\": the entry is valid and loads, but a validator should report it, for the reason explained under \"warnings\". Format and usage: docs/research/eci-dic-format.md, section 11.",
 	"reasons": {
 		"emptyKey": "The key is empty.",
 		"emptyValue": "The value is empty.",
@@ -13,13 +13,18 @@
 		"mainKeyFinalPunctuation": "A main key ends with a punctuation character.",
 		"rootKeyInvalid": "A root key is not letters with optional internal apostrophes. An apostrophe may not be first, last, or next to another apostrophe.",
 		"rootValueInvalid": "A root value is not one word of letters or one bare SPR (`[...]).",
-		"abbreviationKeyInvalid": "An abbreviation key is not letters separated by single periods, with an optional trailing period and optional internal apostrophes. Hyphens and other punctuation are invalid.",
+		"abbreviationKeyInvalid": "An abbreviation key is not letters separated by single periods, with an optional trailing period and optional internal apostrophes. A hyphen is allowed only straight after a period that joins two words, as in Dipl.-Ing. Other hyphens and other punctuation are invalid.",
 		"abbreviationValueInvalid": "An abbreviation value is not words of letters separated by single spaces or hyphens.",
 		"unencodableCharacter": "The key or value contains a character the voice's code page cannot encode. All Western voices use Windows-1252.",
+		"keyTooLong": "The key is longer than 128 bytes after encoding in the voice's code page. Eloquence rejects a whole file that contains such an entry.",
+		"valueTooLong": "The value is longer than 512 bytes after encoding in the voice's code page. Eloquence rejects a whole file that contains such an entry.",
 		"sprUnclosed": "An SPR opened with `[ has no closing ] before the next `[ or the end of the value.",
 		"sprEmpty": "An SPR has nothing between `[ and ].",
 		"sprQuoteInvalid": "An SPR has an unmatched apostrophe, or a quoted symbol that is not exactly two characters.",
 		"sprPrimaryStressRequired": "An SPR with more than one syllable has no primary stress marker 1."
+	},
+	"warnings": {
+		"abbreviationKeyNeverMatches": "An English (enu or eng) abbreviation key contains a hyphen. The engine loads the entry but never matches it, so the entry is never used."
 	},
 	"examples": [
 		{"voice": "enu", "slot": "main", "key": "", "value": "word", "expected": "emptyKey"},
@@ -67,7 +72,12 @@
 		{"voice": "enu", "slot": "abbr", "key": "e.g.", "value": "for example", "expected": "valid"},
 		{"voice": "enu", "slot": "abbr", "key": "WWII's", "value": "world war twos", "expected": "valid"},
 		{"voice": "enu", "slot": "abbr", "key": "Ltjg", "value": "lieutenant junior-grade", "expected": "valid"},
-		{"voice": "deu", "slot": "abbr", "key": "Dipl.-Ing.", "value": "Diplomingenieur", "expected": "abbreviationKeyInvalid", "note": "Hyphens are invalid in abbreviation keys. Use a main entry instead."},
+		{"voice": "deu", "slot": "abbr", "key": "Dipl.-Ing.", "value": "Diplomingenieur", "expected": "valid", "note": "A hyphen straight after a period is valid. The German curators and engine tests confirm that these keys work."},
+		{"voice": "enu", "slot": "abbr", "key": "Lt.-Col.", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "Engine tests show that US English loads abbreviation keys with a hyphen but never matches them."},
+		{"voice": "eng", "slot": "abbr", "key": "Lt.-Col.", "value": "lieutenant colonel", "expected": "valid", "warning": "abbreviationKeyNeverMatches", "note": "Inferred from the US English tests. British English was not tested."},
+		{"voice": "deu", "slot": "abbr", "key": "Dipl-Ing.", "value": "Diplomingenieur", "expected": "abbreviationKeyInvalid", "note": "A hyphen that does not follow a period is invalid."},
+		{"voice": "deu", "slot": "abbr", "key": "Dipl.-", "value": "Diplom", "expected": "abbreviationKeyInvalid", "note": "A hyphen must be followed by a letter."},
+		{"voice": "deu", "slot": "abbr", "key": "km/h", "value": "Kilometer pro Stunde", "expected": "abbreviationKeyInvalid", "note": "Slashes and ampersands are invalid. English engines load them but never match them."},
 		{"voice": "enu", "slot": "abbr", "key": ".Dr", "value": "doctor", "expected": "abbreviationKeyInvalid"},
 		{"voice": "enu", "slot": "abbr", "key": "Dr..", "value": "doctor", "expected": "abbreviationKeyInvalid"},
 		{"voice": "enu", "slot": "abbr", "key": "'Dr", "value": "doctor", "expected": "abbreviationKeyInvalid"},
@@ -87,6 +97,13 @@
 		{"voice": "enu", "slot": "main", "key": "漢", "value": "han", "expected": "unencodableCharacter"},
 		{"voice": "enu", "slot": "main", "key": "word", "value": "ā", "expected": "unencodableCharacter"},
 		{"voice": "enu", "slot": "root", "key": "łabędź", "value": "word", "expected": "unencodableCharacter", "note": "Letters outside Windows-1252 fail the encoding rule, not the root key rule."},
+
+		{"voice": "enu", "slot": "main", "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "value": "word", "expected": "valid", "note": "A key can be 128 bytes long."},
+		{"voice": "enu", "slot": "main", "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "value": "word", "expected": "keyTooLong"},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "expected": "valid", "note": "A value can be 512 bytes long."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "expected": "valueTooLong"},
+		{"voice": "fra", "slot": "main", "key": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé", "value": "mot", "expected": "valid", "note": "Length is measured after encoding in the voice's code page. This key is 128 bytes in Windows-1252, although it would be 256 in UTF-8."},
+		{"voice": "enu", "slot": "main", "key": "漢aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "value": "word", "expected": "unencodableCharacter", "note": "A key that cannot be encoded has no byte length, so it fails only the encoding rule."},
 
 		{"voice": "enu", "slot": "main", "key": "word", "value": "`[abc", "expected": "sprUnclosed"},
 		{"voice": "enu", "slot": "main", "key": "word", "value": "`[]", "expected": "sprEmpty"},
