@@ -108,18 +108,34 @@ def test_word_root_rejects_apostrophes_at_the_edges_doubled_or_other_punctuation
 		"Dr!",
 		"D2",
 		"two words",
-		"Dipl-Ing.",
 		"-Dipl.",
 		"Dipl.-",
 		"Dipl.--Ing.",
 		"Dipl.-.Ing.",
 		"Dipl.-'Ing.",
-		"km/h",
-		"A&B",
+		"&T",
+		"A--B",
+		"A/",
+		"A&",
+		"A/.",
+		"A./B",
 	],
 )
-def test_abbreviation_key_validation_catalog(key: str) -> None:
-	assert codes(Entry(key, "doctor"), Slot.ABBREVIATION) == [
+@pytest.mark.parametrize("language", ["enu", "eng", "deu"])
+def test_abbreviation_key_validation_catalog(key: str, language: str) -> None:
+	assert codes(Entry(key, "doctor"), Slot.ABBREVIATION, language) == [
+		ValidationCode.ABBREVIATION_KEY_INVALID,
+	]
+	assert entry_warnings(Entry(key, "doctor"), Slot.ABBREVIATION, language) == ()
+
+
+@pytest.mark.parametrize("key", ["Dipl-Ing.", "Lt-Col", "km/h", "AT&T"])
+@pytest.mark.parametrize("language", ["deu", "fra", "esp"])
+def test_abbreviation_keys_with_other_hyphens_slashes_or_ampersands_are_invalid_outside_english(
+	key: str,
+	language: str,
+) -> None:
+	assert codes(Entry(key, "doctor"), Slot.ABBREVIATION, language) == [
 		ValidationCode.ABBREVIATION_KEY_INVALID,
 	]
 
@@ -147,9 +163,13 @@ def test_hyphenated_abbreviation_keys_have_no_warning_outside_english(language: 
 	assert entry_warnings(entry, Slot.ABBREVIATION, language) == ()
 
 
+@pytest.mark.parametrize("key", ["Lt.-Col.", "Dipl.-Ing.", "Lt-Col", "km/h", "AT&T", "R&D-Abt."])
 @pytest.mark.parametrize("language", ["enu", "eng"])
-def test_english_hyphenated_abbreviation_keys_are_valid_but_warned(language: str) -> None:
-	entry = Entry("Lt.-Col.", "lieutenant colonel")
+def test_english_abbreviation_keys_with_hyphens_slashes_or_ampersands_are_valid_but_warned(
+	key: str,
+	language: str,
+) -> None:
+	entry = Entry(key, "plain words")
 
 	warnings = entry_warnings(entry, Slot.ABBREVIATION, language)
 
@@ -158,14 +178,15 @@ def test_english_hyphenated_abbreviation_keys_are_valid_but_warned(language: str
 		(WarningCode.ABBREVIATION_KEY_NEVER_MATCHES, Field.KEY),
 	]
 	assert warnings[0].message == (
-		"Eloquence would never use this entry, because English abbreviations with a hyphen never match. "
-		+ "Use an Exact word entry instead."
+		"Eloquence would never use this entry, because English abbreviations with a hyphen, slash "
+		+ "or ampersand never match. Use an Exact word entry instead."
 	)
 	validate_or_raise(entry, Slot.ABBREVIATION, language)
 
 
-def test_entries_that_fail_validation_have_no_warnings() -> None:
-	entry = Entry("Lt.-Col.", "two  words")
+@pytest.mark.parametrize("key", ["Lt.-Col.", "AT&T"])
+def test_entries_that_fail_validation_have_no_warnings(key: str) -> None:
+	entry = Entry(key, "two  words")
 
 	assert codes(entry, Slot.ABBREVIATION) == [ValidationCode.ABBREVIATION_VALUE_INVALID]
 	assert entry_warnings(entry, Slot.ABBREVIATION, "enu") == ()

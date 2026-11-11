@@ -84,8 +84,15 @@ MAX_KEY_BYTES = 128
 MAX_VALUE_BYTES = 512
 """The longest value, in bytes in the voice's code page, that Eloquence accepts."""
 
-# Engine tests on #173: these voices load an abbreviation key with a hyphen but never match it.
-_HYPHEN_ABBREVIATION_NEVER_MATCHES = frozenset({"enu", "eng"})
+# Engine tests on #173: these voices load an abbreviation key with a hyphen, slash or ampersand
+# but never match it.
+_NEVER_MATCHING_ABBREVIATION_LANGUAGES = frozenset({"enu", "eng"})
+_NEVER_MATCHING_ABBREVIATION_CHARACTERS = frozenset("-/&")
+
+# A period joins two abbreviation words, and a hyphen may follow it, as in "Dipl.-Ing.".
+_ABBREVIATION_SEPARATOR = re.compile(r"\.-?")
+# English voices also load a hyphen, slash or ampersand on its own between two words.
+_ENGLISH_ABBREVIATION_SEPARATOR = re.compile(r"\.-?|[-/&]")
 
 
 class EntryValidationError(ValueError):
@@ -164,15 +171,23 @@ def _is_word_with_internal_apostrophes(word: str) -> bool:
 	return all(part.isalpha() for part in word.split("'"))
 
 
-def _valid_abbreviation_key(key: str) -> bool:
+def _valid_abbreviation_key(key: str, language: Language) -> bool:
 	"""Return whether *key* is words joined by periods, with an optional trailing period.
 
 	Each word is letters with optional internal apostrophes. A hyphen is allowed
-	only straight after a joining period, as in "Dipl.-Ing.".
+	straight after a joining period, as in "Dipl.-Ing.". English voices also accept
+	a hyphen, slash or ampersand in place of a joining period, as in "AT&T"; the
+	engine loads those keys but never matches them, so :func:`entry_warnings`
+	reports them.
 	"""
 
 	body = key[:-1] if key.endswith(".") else key
-	return all(_is_word_with_internal_apostrophes(part) for part in re.split(r"\.-?", body))
+	separator = (
+		_ENGLISH_ABBREVIATION_SEPARATOR
+		if language.code in _NEVER_MATCHING_ABBREVIATION_LANGUAGES
+		else _ABBREVIATION_SEPARATOR
+	)
+	return all(_is_word_with_internal_apostrophes(part) for part in separator.split(body))
 
 
 def _valid_abbreviation_value(value: str) -> bool:
@@ -182,7 +197,7 @@ def _valid_abbreviation_value(value: str) -> bool:
 	return bool(parts) and all(part.isalpha() for part in parts)
 
 
-def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
+def _slot_issues(entry: Entry, slot: Slot, language: Language) -> list[ValidationIssue]:
 	issues: list[ValidationIssue] = []
 	if not entry.key or not entry.value:
 		return issues
@@ -215,7 +230,7 @@ def _slot_issues(entry: Entry, slot: Slot) -> list[ValidationIssue]:
 			)
 			issues.append(_issue(ValidationCode.ROOT_VALUE_INVALID, Field.VALUE, message))
 	else:
-		if not _valid_abbreviation_key(entry.key):
+		if not _valid_abbreviation_key(entry.key, language):
 			message = _(
 				# Translators: Abbreviation validation error with examples of permitted keys.
 				'An abbreviation can contain only letters and periods, with apostrophes inside the word and hyphens straight after a period — for example "Dr.", "e.g." or "Dipl.-Ing.".',
@@ -345,7 +360,7 @@ def validate_entry(
 	issues = list(mechanical)
 	mechanically_invalid_fields = {issue.field for issue in mechanical}
 	if not mechanically_invalid_fields:
-		issues.extend(_slot_issues(entry, slot_value))
+		issues.extend(_slot_issues(entry, slot_value, language_record))
 	issues.extend(_encoding_issues(entry, language_record))
 	issues.extend(_length_issues(entry, language_record))
 	if slot_value is not Slot.ABBREVIATION and Field.VALUE not in mechanically_invalid_fields:
@@ -370,12 +385,12 @@ def entry_warnings(
 		return ()
 	if (
 		slot_value is Slot.ABBREVIATION
-		and language_record.code in _HYPHEN_ABBREVIATION_NEVER_MATCHES
-		and "-" in entry.key
+		and language_record.code in _NEVER_MATCHING_ABBREVIATION_LANGUAGES
+		and not _NEVER_MATCHING_ABBREVIATION_CHARACTERS.isdisjoint(entry.key)
 	):
 		message = _(
-			# Translators: Abbreviation error for English voices, which load an abbreviation containing a hyphen but never use it.
-			"Eloquence would never use this entry, because English abbreviations with a hyphen never match. Use an Exact word entry instead.",
+			# Translators: Abbreviation error for English voices, which load an abbreviation containing a hyphen, slash or ampersand but never use it.
+			"Eloquence would never use this entry, because English abbreviations with a hyphen, slash or ampersand never match. Use an Exact word entry instead.",
 		)
 		return (
 			ValidationWarning(

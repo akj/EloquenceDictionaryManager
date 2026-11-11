@@ -93,8 +93,9 @@ Entries are checked before they are accepted:
   internal apostrophes. A hyphen may follow a period, as in the German
   "Dipl.-Ing.". Capitalization matters. The expansion must contain plain words
   separated by spaces or hyphens, without phonetic strings or annotations.
-- Eloquence never uses an English abbreviation that contains a hyphen, so
-  these entries are not accepted. Use an **Exact word** entry instead.
+- Eloquence never uses an English abbreviation that contains a hyphen, slash,
+  or ampersand, so these entries are not accepted. Use an **Exact word** entry
+  instead.
 
 Choose **Remove** to delete a personal-only entry. Removing a personal override
 immediately restores the managed pronunciation. Managed entries themselves

@@ -235,7 +235,7 @@ def test_refresh_reports_entries_the_engine_never_uses_separately(tmp_path: Path
 	_write_lock(lock_path)
 	upstream_root = tmp_path / "upstream"
 	_ = _write_upstream_tree(upstream_root)
-	never_used = b"Lt.-Col.\tlieutenant colonel\r\nDr.\tdoctor\r\n"
+	never_used = b"Lt.-Col.\tlieutenant colonel\r\nAT&T\tA T and T\r\nDr.\tdoctor\r\n"
 	_ = (upstream_root / "ENUabbr.dic").write_bytes(never_used)
 	warnings: list[str] = []
 
@@ -243,8 +243,9 @@ def test_refresh_reports_entries_the_engine_never_uses_separately(tmp_path: Path
 
 	assert files["enuabbr.dic"] == never_used
 	assert warnings == [
-		"ENUabbr.dic: 1 line(s) are valid but have a validation warning; the engine loads them "
-		+ "but never uses them (line 1: 'Lt.-Col.': abbreviationKeyNeverMatches)",
+		"ENUabbr.dic: 2 line(s) are valid but have a validation warning; the engine loads them "
+		+ "but never uses them (line 1: 'Lt.-Col.': abbreviationKeyNeverMatches; "
+		+ "line 2: 'AT&T': abbreviationKeyNeverMatches)",
 	]
 
 

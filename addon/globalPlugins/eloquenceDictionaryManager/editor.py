@@ -106,7 +106,7 @@ def _entry_rules() -> dict[Slot, str]:
 		),
 		Slot.ABBREVIATION: _(
 			# Translators: Rules shown for an abbreviation dictionary entry.
-			'Matches an abbreviation written with letters and periods — capitalization counts. A trailing period is meaningful: "approx." matches only "approx.", while "approx" matches both "approx" and "approx.". A hyphen may follow a period, as in the German "Dipl.-Ing.", but English voices never match an abbreviation with a hyphen. The expansion must be plain words.',
+			'Matches an abbreviation written with letters and periods — capitalization counts. A trailing period is meaningful: "approx." matches only "approx.", while "approx" matches both "approx" and "approx.". A hyphen may follow a period, as in the German "Dipl.-Ing.", but English voices never match an abbreviation with a hyphen, slash or ampersand. The expansion must be plain words.',
 		),
 	}
 
