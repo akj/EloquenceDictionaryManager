@@ -179,7 +179,7 @@ General Public License, version 2 or later (GPL-2.0-or-later). See
 The bundled dictionary data is licensed separately. The bundled
 [eigencrow IBMTTSDictionaries](https://github.com/eigencrow/IBMTTSDictionaries)
 set is licensed under
-[CC0-1.0](https://github.com/eigencrow/IBMTTSDictionaries/blob/d997036dec4b5aad80ad53d8133326a67d1f41ec/LICENSE.md),
+[CC0-1.0](https://github.com/eigencrow/IBMTTSDictionaries/blob/9c6c401a7aa12f28a41829dddb007fdc46b97730/LICENSE.md),
 a public domain dedication. Credit goes to eigencrow and the upstream
 contributors who curate this set.
 
