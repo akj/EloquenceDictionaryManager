@@ -40,6 +40,12 @@ language and set in four columns: **Word**, **Pronunciation**, **Type**, and
 **Source**. The source tells you whether an entry is managed, personal, or a
 personal override of a managed entry.
 
+A personal **Word root** entry also overrides the managed set's **Exact word**
+entries for the same word, whatever their capitalization. Eloquence prefers an
+exact-word entry to a root entry, so those managed entries are left out and your
+root entry applies. The list hides them while your root entry exists and shows
+them again when you remove it.
+
 Use **Filter by:** (Alt+F) to filter by the beginning of a word; exact matches
 are shown first. Use **Show:** (Alt+W) to choose **All entries**, **Personal
 only**, **Personal overrides only**, or **Managed only**.
