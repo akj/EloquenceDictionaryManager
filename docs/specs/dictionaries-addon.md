@@ -162,6 +162,50 @@ Only the first is eligible for and included in the v1 package. The second ID is
 retained as the stable identity used by migration history and for a possible
 future licensed package.
 
+A synth that downloads a GitHub repository as a set derives its ID with these
+rules, so every synth gives the same repository the same ID and a download
+matches an installed copy of the same dataset. See
+[ADR 0003](../adr/0003-set-ids-for-downloaded-repositories.md).
+
+1. The two repositories above keep their registered IDs:
+   `eigencrow/IBMTTSDictionaries` is `github.eigencrow.ibmtts-dictionaries`,
+   and `Mohamed00/AltIBMTTSDictionaries` is
+   `github.mohamed00.alt-ibmtts-dictionaries`.
+2. Any other repository gets `github.<owner>.<repo>`, with the owner and the
+   repository name each encoded as described below.
+3. A synth that offers a sub-folder of dictionary files as a separate set, such
+   as the `IBMTTS 6.7` folder in AltIBMTTSDictionaries, appends `..` and the
+   encoded folder path to the repository's ID, registered or not. The
+   repository's top-level files keep the ID without a folder.
+
+To encode a name, lowercase its ASCII letters and keep `a`–`z`, `0`–`9`, and
+`-`. Replace every other character with `.` followed by the two lowercase hex
+digits of each of its UTF-8 bytes. This is percent-encoding with `.` in place of
+`%`. A nested folder path joins its folders with `/` before encoding. GitHub
+owner names contain only letters, digits, and hyphens, so an encoded owner is
+the owner lowercased. For example:
+
+- `fastfinge/eloquence_64` is `github.fastfinge.eloquence.5f64`.
+- `example/dict.js` is `github.example.dict.2ejs`, and `example/dict-js` is
+  `github.example.dict-js`.
+- `example/.github` is `github.example..2egithub`.
+- The `IBMTTS 6.7` folder in AltIBMTTSDictionaries is
+  `github.mohamed00.alt-ibmtts-dictionaries..ibmtts.206.2e7`.
+- A `British/v2` folder in `example/dicts` is
+  `github.example.dicts..british.2fv2`.
+
+An owner contains no `.`, and an encoded name uses `.` only before two hex
+digits, so an ID can be read back into its owner, repository, and folder.
+Different repositories and folders therefore never share an ID. Folder paths
+that differ only in the case of ASCII letters are the same folder, as they are
+on Windows.
+
+Rule 2 must never produce a registered ID. The repositories
+`eigencrow/ibmtts-dictionaries` and `mohamed00/alt-ibmtts-dictionaries` would
+get exactly the registered IDs, so they get no ID, and a synth doesn't offer
+them as sets. Any set EDM registers later takes the ID that rule 2 gives its
+repository, so the two above remain the only exceptions.
+
 Each included set is self-describing. Its `set.ini` declares the same ID as its
 directory and contains:
 
@@ -176,6 +220,9 @@ attribution = <source-owned credit/provenance text>
 license = <SPDX expression or specific permission reference>
 license_url = <license or permission evidence URL>
 ```
+
+A synth's own downloaded copy needs fewer fields; see
+[Missing sets and consumer expectations](#missing-sets-and-consumer-expectations).
 
 Language and slot availability are inferred from the `.dic` files rather than
 duplicated in metadata. Consumers persist `id` and display `name`. The editor
@@ -220,6 +267,39 @@ EDM's licensing or review. A downloaded copy uses the set's Managed Dictionary
 Set ID and the same `.dic` file layout as an installed copy, and the synth
 treats it like an installed set once downloaded. EDM's redistribution
 requirements, such as license metadata in `set.ini`, do not apply to it.
+
+A downloaded copy's `set.ini` needs only these fields:
+
+```ini
+[set]
+id = <ID from the rules in Managed Dictionary Set identity and metadata>
+name = <repository name, followed by /<folder path> for a sub-folder set>
+source_url = <repository URL>
+source_revision = <full commit SHA, if known>
+source_version = <release tag, only if the copy came from one>
+```
+
+`id`, `name`, and `source_url` are required. `source_revision` and
+`source_version` are optional. A downloaded copy isn't redistributed, so its
+`set.ini` has no `attribution`, `license`, or `license_url`. A download of
+`/archive/HEAD.zip` has no release tag, so it has no `source_version`. GitHub
+stores the full commit SHA as the zip file's comment, and also in the name of
+the archive's top folder, `<repo>-<SHA>/`. A synth records the comment as
+`source_revision` when it is 40 lowercase hex digits.
+
+A synth's reader applies these rules only to its own downloaded copies, which it
+keeps in its own folder rather than finding through `contract.ini`. A set that a
+provider ships still needs every field listed in
+[Managed Dictionary Set identity and metadata](#managed-dictionary-set-identity-and-metadata),
+and a provider set that lacks one is still ignored. Where a synth shows
+`source_version` after a set's name, as in `Managed — <name> (<source_version>)`,
+it shows a copy without one by name alone, for example
+`Managed — AltIBMTTSDictionaries/IBMTTS 6.7`. It shows no empty parentheses,
+and no SHA in place of the version.
+
+These rules and the ID rules change nothing that a provider ships or that a
+version 1 consumer reads from a provider, so they stay within contract
+version 1.
 
 When an installed provider and a synth's own download both supply the same
 set ID, the synth shows one row for that set and uses the installed
