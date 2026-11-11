@@ -11,4 +11,4 @@ A synth that downloads a GitHub repository as a Managed Dictionary Set needs an 
 
 ## Consequences
 
-Repository names with only letters, digits, and hyphens keep the ID the Eloquence design announced. Other names, and most folder names, give IDs such as `github.mohamed00.alt-ibmtts-dictionaries..ibmtts.206.2e7` that are hard to read, but users see a set's `name`, not its ID. A derived ID comes from the repository's current name, so a fresh download after a rename or transfer gets a new ID. The Eloquence design's rule had the same limit.
+Repository names with only letters, digits, and hyphens keep the ID the Eloquence design announced. Other names, and most folder names, give IDs such as `github.mohamed00.alt-ibmtts-dictionaries..ibmtts.206.2e7` that are hard to read, but users see a set's `name`, not its ID. The rule assigns an ID when a synth first downloads a repository. What a synth does when that repository is later renamed or transferred is left open, as it was under the Eloquence design.
