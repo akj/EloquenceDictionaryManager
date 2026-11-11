@@ -23,7 +23,7 @@ The package bundles the `github.eigencrow.ibmtts-dictionaries` set from
 [eigencrow IBMTTSDictionaries](https://github.com/eigencrow/IBMTTSDictionaries).
 The bundled dictionary data is licensed separately from the add-on software
 under CC0-1.0, a public domain dedication. Its upstream license is
-[`LICENSE.md`](https://github.com/eigencrow/IBMTTSDictionaries/blob/d997036dec4b5aad80ad53d8133326a67d1f41ec/LICENSE.md).
+[`LICENSE.md`](https://github.com/eigencrow/IBMTTSDictionaries/blob/9c6c401a7aa12f28a41829dddb007fdc46b97730/LICENSE.md).
 
 [mohamed00 AltIBMTTSDictionaries](https://github.com/Mohamed00/AltIBMTTSDictionaries)
 is not bundled and has no redistribution license grant. Only hashes derived

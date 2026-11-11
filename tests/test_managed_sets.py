@@ -200,6 +200,6 @@ def test_real_vendored_managed_set_is_discoverable() -> None:
 	managed_set = sets[0]
 	assert managed_set.id == "github.eigencrow.ibmtts-dictionaries"
 	assert managed_set.name == "IBMTTSDictionaries"
-	assert managed_set.source_version == "v26.07"
+	assert managed_set.source_version == "v26.11"
 	assert managed_set.entries_for("enu", Slot.MAIN)
 	assert managed_set.entries_for("deu", Slot.MAIN)
