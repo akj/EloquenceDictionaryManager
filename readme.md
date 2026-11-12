@@ -81,6 +81,15 @@ read your dictionary entries. With any other synthesizer, the buttons remain
 available but announce: "Preview unavailable: switch to Eloquence or OpenEVV to
 hear pronunciations."
 
+**Play new** first checks the Pronunciation. If it breaks a rule below, you hear
+the reason and nothing is spoken. Both synthesizers read a backquote in spoken
+text as a space unless their backquote voice tags setting is on, and it is off
+by default. So when a Pronunciation contains a phonetic string or another
+backquote code and that setting is off, Play new tells you to turn on backquote
+voice tags in Voice settings and speaks nothing. The add-on never changes the
+setting for you. A future synthesizer version may offer a way to preview these
+Pronunciations without the setting; Play new uses it when it is there.
+
 Entries are checked before they are accepted:
 
 - Both Word and Pronunciation must contain text. Tabs, line breaks, and NUL
@@ -90,7 +99,12 @@ Entries are checked before they are accepted:
   dictionary file that has a longer entry.
 - **Exact word** entries cannot contain spaces or end with punctuation.
   Capitalization matters. Pronunciations may use ordinary text, Eloquence
-  phonetic strings, and emphasis codes.
+  phonetic strings such as `` `[.1Ar.0min] ``, emphasis codes `` `0 `` to
+  `` `4 `` and `` `00 `` after a space, and spelling codes `` `ts0 `` to
+  `` `ts3 ``. A spelling code that turns spelling on must be turned off with
+  `` `ts0 `` before the end. Other backquote codes, such as pause, voice, or
+  volume codes, are not accepted in any entry, because they can silence or
+  change speech after the word.
 - **Word root** entries contain letters, with apostrophes allowed inside the
   word, such as "j'accuse". They are stored in lowercase and ignore
   capitalization when matching. A pronunciation must be one bare word or one

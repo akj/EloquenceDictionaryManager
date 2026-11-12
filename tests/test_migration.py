@@ -361,3 +361,14 @@ def test_reclassification_after_import_has_no_new_default_checked_rows() -> None
 
 	assert second_rows == ()
 	assert not any(row.checked_by_default for row in second_rows)
+
+
+def test_entries_with_a_disallowed_backquote_code_are_shown_as_invalid_and_cannot_be_checked() -> None:
+	candidate = _candidate("loud", "`vv100 word")
+
+	rows = classify_migration_candidates((candidate,), PersonalOverlay(), _HistoricalUnionStub())
+
+	assert [(row.status, row.checked_by_default, row.checkable) for row in rows] == [
+		(MigrationCandidateStatus.INVALID, False, False),
+	]
+	assert rows[0].status_text.startswith("A backquote can only start a phonetic string")

@@ -345,7 +345,8 @@ Whether a newly discovered set starts turned on is each consumer's choice:
   to US English, because its built-in US English dictionary began as that set
   and has been corrected since.
 
-EDM never calls into a synth to apply a change or turn a set on. Driver
+EDM never calls into a synth to apply a change or turn a set on. The one call it
+makes is the optional preview method described under [Preview](#preview). Driver
 settings, temp-file merge mechanics, change detection, host commands, and language-fallback
 implementation belong in each consumer repository, not here.
 
@@ -555,7 +556,31 @@ The minimum validation contract is:
   ([fastfinge/eloquence_64#173](https://github.com/fastfinge/eloquence_64/issues/173)),
   which rejects a whole file that has an entry over them;
 - **Exact word** keys contain no whitespace and do not end in punctuation;
-  values may contain ordinary text, SPRs, and annotations;
+  values may contain ordinary text and three kinds of backquote code (see
+  below);
+- every backquote in a value must begin one of these three forms. Any other
+  backquote makes the entry invalid (`annotationInvalid`), whatever the slot:
+  - an SPR, `` `[ `` … `]`, at the start of the value or after whitespace;
+  - an emphasis code, `` `00 `` or one digit `` `0 `` to `` `4 `` not followed
+    by another digit, at the start of the value or after whitespace, and
+    followed by whitespace; and
+  - a spelling-mode code, `` `ts0 `` to `` `ts3 ``, not followed by another
+    digit. Text may follow it directly, as in `` `ts1AOK `ts0 ``. A value that
+    turns spelling on with `` `ts1 `` to `` `ts3 `` must turn it off with
+    `` `ts0 `` before it ends (`spellingModeUnclosed`).
+
+  The engine accepts any annotation in an Exact word value, and it reads a
+  dictionary value's codes whatever a synth's backquote voice tags setting
+  says: that setting changes only spoken text. The ECI manual describes a pause
+  code that can last about 330 seconds, voice, volume and speed codes that stay
+  in effect until changed or the program restarts, and spelling modes that stay
+  on until `` `ts0 `` (`tts.txt` in fastfinge/eloquence_64, lines 376, 3336–3338,
+  3446–3447 and 3500–3510). None of this has been tested on an engine. A shared
+  `.edm-dict` file, a downloaded set, or a bad upstream commit could carry such a
+  code, so the definition of a valid entry allows only the three forms. Every
+  Exact word value in the bundled set, in the Community and Alt repositories,
+  and in OpenEVV's built-in dictionary uses only these forms, in these
+  positions;
 - **Word root** keys contain letters, with apostrophes allowed inside the word
   (`j'accuse`), and are stored lowercase; values are one bare word or one bare
   SPR, with no annotation or multi-word value. The manual allows letters only,
@@ -596,17 +621,58 @@ runtime, because EDM may be disabled or removed.
 
 ### Preview
 
-Preview bypasses NVDA's speech-dictionary and symbol-processing pipeline. It
-runs only through synths that read EDM's managed sets and personal overlay:
-Eloquence (`eloquence`) and OpenEVV (`openevv`). When one of them is active,
-both Play buttons call `speech.cancelSpeech()` and then
-`synthDriverHandler.getSynth().speak()` with the relevant word.
+Preview bypasses NVDA's speech-dictionary and symbol-processing pipeline.
+**Play current** runs only through synths that read EDM's managed sets and
+personal overlay: Eloquence (`eloquence`) and OpenEVV (`openevv`). When one of
+them is active, it calls `speech.cancelSpeech()` and then
+`synthDriverHandler.getSynth().speak()` with the word.
 
-Play stays enabled and in the tab order when neither synth is active.
-Activating it speaks the translatable explanation: "Preview unavailable: switch
-to Eloquence or OpenEVV to hear pronunciations." It does not cancel speech
-first. EDM never previews through a synth that does not read its entries and
-never switches synths temporarily.
+**Play new** works in this order:
+
+1. It checks the Word and Pronunciation as **OK** would. If the pronunciation
+   is invalid, it announces the validation message and speaks nothing.
+   Problems with the Word are ignored, so a pronunciation can be heard before
+   the Word is typed.
+2. If the loaded synth driver has the preview method below, Play new cancels
+   speech and calls it with the pronunciation.
+3. Otherwise, with Eloquence or OpenEVV, it reads the synth's backquote voice
+   tags setting: `backquoteVoiceTags` on Eloquence and `voiceTags` on OpenEVV.
+   Both default to off, and while it is off the synth turns every backquote in
+   spoken text into a space, so a phonetic string would be read as letters. If
+   the pronunciation contains a backquote and the setting is off, Play new
+   announces "To hear pronunciations with phonetic strings or other backquote
+   codes, turn on backquote voice tags in Voice settings." and speaks nothing.
+   Otherwise it cancels speech and calls `speak()` with the pronunciation.
+4. With any other synth, it announces the explanation below.
+
+EDM reads a synth's voice tags setting and never changes it. The
+pronunciation's codes are previewed correctly with the setting off only when
+the synth implements the preview method.
+
+Both Play buttons stay enabled and in the tab order when no synth can preview.
+Activating one then speaks the translatable explanation: "Preview unavailable:
+switch to Eloquence or OpenEVV to hear pronunciations." It does not cancel
+speech first. EDM never previews through a synth that does not read its entries
+or implement the preview method, and never switches synths temporarily.
+
+#### Preview method
+
+The preview method is an optional part of directory contract version 1. A
+synth that supports it lets EDM preview a pronunciation exactly as a dictionary
+entry would say it, without the user turning on backquote voice tags. No synth
+implements it yet.
+
+- The synth driver object has a callable attribute `previewEciPronunciation`
+  that takes one `str`: a pronunciation exactly as it appears after the tab in
+  a dictionary file. EDM detects it with `getattr`. Having the method is the
+  opt-in, whatever the synth's name.
+- The synth speaks the pronunciation once, in the current voice and language,
+  through its normal text pipeline, so its crash-word filters still run.
+- Any add-on can call the method, so the synth applies the same rule as
+  [Validation](#validation) itself: SPRs, emphasis codes and spelling-mode
+  codes in the permitted positions are honoured for this utterance only, and
+  every other backquote becomes a space.
+- Afterwards, no setting or engine state has changed, and spelling mode is off.
 
 ## Overlay export and import
 

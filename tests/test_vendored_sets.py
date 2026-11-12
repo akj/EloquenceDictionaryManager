@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ecidic import ValidationCode, parse_dictionary_bytes, parse_dictionary_filename, validate_entry
 from vendored_sets import VendoringError, load_lock, process_upstream_tree, verify_tree, write_vendored_sets
 
 
@@ -247,6 +248,45 @@ def test_refresh_reports_entries_the_engine_never_uses_separately(tmp_path: Path
 		+ "but never uses them (line 1: 'Lt.-Col.': abbreviationKeyNeverMatches; "
 		+ "line 2: 'AT&T': abbreviationKeyNeverMatches)",
 	]
+
+
+def test_refresh_reports_a_disallowed_backquote_code_as_a_violation(tmp_path: Path) -> None:
+	lock_path = tmp_path / "dictionarySources.lock.ini"
+	_write_lock(lock_path)
+	upstream_root = tmp_path / "upstream"
+	_ = _write_upstream_tree(upstream_root)
+	_ = (upstream_root / "ENUmain.dic").write_bytes(b"hello\thello\r\nloud\t`vv100 word\r\n")
+	warnings: list[str] = []
+
+	_ = process_upstream_tree(upstream_root, load_lock(lock_path).sets[SET_ID], warnings)
+
+	assert len(warnings) == 1
+	assert "ENUmain.dic: 1 line(s) violate" in warnings[0]
+	assert "line 2: 'loud': A backquote can only start" in warnings[0]
+
+
+def test_every_bundled_entry_uses_only_permitted_backquote_codes() -> None:
+	sets_directory = Path(__file__).resolve().parents[1] / "addon" / "dictionaries" / "sets"
+	with_backquote = 0
+	failures: list[str] = []
+	for path in sorted(sets_directory.rglob("*.dic")):
+		filename = parse_dictionary_filename(path.name)
+		entries = parse_dictionary_bytes(
+			path.read_bytes(),
+			filename.language,
+			filename.slot,
+			allow_invalid_entries=True,
+		)
+		for entry in entries:
+			with_backquote += "`" in entry.value
+			failures.extend(
+				f"{path.name}: {entry.key!r}: {issue.code.value}"
+				for issue in validate_entry(entry, filename.slot, filename.language)
+				if issue.code in {ValidationCode.ANNOTATION_INVALID, ValidationCode.SPELLING_MODE_UNCLOSED}
+			)
+
+	assert failures == []
+	assert with_backquote > 70_000
 
 
 def test_refresh_rejects_an_upstream_tree_without_dictionaries(tmp_path: Path) -> None:

@@ -50,7 +50,7 @@ from .ecidic.migration import (
 from .ecidic.model import Entry, Slot
 from .ecidic.overlay import load_personal_overlay, save_personal_overlay
 from .ecidic.parsing import DictionaryEncodingError, key_identity
-from .ecidic.preview import can_preview
+from .ecidic.preview import PREVIEW_METHOD, PlayNew, can_preview, play_new
 from .ecidic.sets import ManagedSet, discover_managed_sets
 from .ecidic.validation import EntryValidationError, Field, entry_warnings, normalize_entry, validate_entry
 from . import CONFIG_SECTION
@@ -99,7 +99,7 @@ def _entry_rules() -> dict[Slot, str]:
 	return {
 		Slot.MAIN: _(
 			# Translators: Rules shown for an exact-word dictionary entry.
-			'Matches the word exactly as written — capitalization counts, so "NASA" and "nasa" are separate entries. The word cannot contain spaces or end with punctuation. The pronunciation may be words, phonetic strings like `[.1kwi.0nwa], or emphasis codes `0 (flat) through `4 (strongest).',
+			'Matches the word exactly as written — capitalization counts, so "NASA" and "nasa" are separate entries. The word cannot contain spaces or end with punctuation. The pronunciation may be words, phonetic strings like `[.1kwi.0nwa], emphasis codes `0 (flat) through `4 (strongest) followed by a space, or spelling codes `ts1 through `ts3 turned off again with `ts0. Other backquote codes are not allowed.',
 		),
 		Slot.ROOT: _(
 			# Translators: Rules shown for a word-root dictionary entry.
@@ -113,6 +113,14 @@ def _entry_rules() -> dict[Slot, str]:
 
 
 _SLOT_ORDER = (Slot.MAIN, Slot.ROOT, Slot.ABBREVIATION)
+
+
+def _announcePreviewUnavailable() -> None:
+	ui.message(
+		# Translators: Message announced when the active synthesizer cannot preview pronunciations.
+		# Eloquence and OpenEVV are synthesizer names.
+		_("Preview unavailable: switch to Eloquence or OpenEVV to hear pronunciations."),
+	)
 
 
 def _available_provider_paths() -> tuple[Path, ...]:
@@ -255,17 +263,41 @@ class EntryDialog(wx.Dialog):
 			speech.cancelSpeech()
 			synth.speak([pronunciation])
 			return
-		ui.message(
-			# Translators: Message announced when the active synthesizer cannot preview pronunciations.
-			# Eloquence and OpenEVV are synthesizer names.
-			_("Preview unavailable: switch to Eloquence or OpenEVV to hear pronunciations."),
-		)
+		_announcePreviewUnavailable()
 
 	def _onPlayCurrent(self, _event: wx.CommandEvent) -> None:
 		self._preview(self._word_control.GetValue())
 
 	def _onPlayNew(self, _event: wx.CommandEvent) -> None:
-		self._preview(self._pronunciation_control.GetValue())
+		entry = Entry(
+			key=self._word_control.GetValue().strip(),
+			value=self._pronunciation_control.GetValue().strip(),
+		)
+		issues = [
+			issue
+			for issue in validate_entry(entry, self._selectedSlot(), self._language)
+			if issue.field is Field.VALUE
+		]
+		if issues:
+			ui.message(issues[0].message)
+			return
+		synth = synthDriverHandler.getSynth()
+		route = play_new(synth, entry.value)
+		if synth is not None and route is PlayNew.PREVIEW_METHOD:
+			speech.cancelSpeech()
+			getattr(synth, PREVIEW_METHOD)(entry.value)
+		elif synth is not None and route is PlayNew.SPEAK:
+			speech.cancelSpeech()
+			synth.speak([entry.value])
+		elif route is PlayNew.NEEDS_VOICE_TAGS:
+			ui.message(
+				_(
+					# Translators: Message announced by Play new when the synthesizer would read a pronunciation's backquote codes as spaces. "Backquote voice tags" names a setting in NVDA's Voice settings.
+					"To hear pronunciations with phonetic strings or other backquote codes, turn on backquote voice tags in Voice settings.",
+				),
+			)
+		else:
+			_announcePreviewUnavailable()
 
 	def onOk(self, _event: wx.CommandEvent) -> None:
 		entry = Entry(

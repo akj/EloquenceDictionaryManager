@@ -15,6 +15,7 @@ from .parsing import (
 	find_dictionary_file,
 	key_identity,
 	load_dictionary_file,
+	serialize_dictionary_bytes,
 	write_dictionary_file,
 )
 from .validation import EntryValidationError, ValidationCode
@@ -126,8 +127,22 @@ def load_personal_overlay(
 
 
 def save_personal_overlay(overlay: PersonalOverlay, directory: str | Path) -> None:
-	"""Commit a working copy to canonical Personal Dictionary Overlay files."""
+	"""Commit a working copy to canonical Personal Dictionary Overlay files.
 
+	Every entry is checked before any file changes, so an entry that fails
+	validation, such as one saved before a rule tightened, leaves every file as it was.
+	"""
+
+	for language_code in LANGUAGES:
+		for slot in Slot:
+			try:
+				_checked = serialize_dictionary_bytes(
+					overlay.entries_for(language_code, slot), language_code, slot
+				)
+			except EntryValidationError as error:
+				if error.issue.code is ValidationCode.UNENCODABLE_CHARACTER:
+					raise DictionaryEncodingError(str(error)) from error
+				raise
 	directory_path = Path(directory)
 	directory_path.mkdir(parents=True, exist_ok=True)
 	for language_code in LANGUAGES:
@@ -141,9 +156,4 @@ def save_personal_overlay(overlay: PersonalOverlay, directory: str | Path) -> No
 			canonical_path = directory_path / canonical_filename(language_code, slot)
 			if existing_path is not None and existing_path.name != canonical_path.name:
 				existing_path.unlink()
-			try:
-				_written_path = write_dictionary_file(directory_path, language_code, slot, entries)
-			except EntryValidationError as error:
-				if error.issue.code is ValidationCode.UNENCODABLE_CHARACTER:
-					raise DictionaryEncodingError(str(error)) from error
-				raise
+			_written_path = write_dictionary_file(directory_path, language_code, slot, entries)

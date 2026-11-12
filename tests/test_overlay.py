@@ -7,7 +7,7 @@ import pytest
 from ecidic.model import Entry, Slot
 from ecidic.overlay import PersonalOverlay, load_personal_overlay, save_personal_overlay
 from ecidic.parsing import DictionaryEncodingError
-from ecidic.validation import EntryValidationError
+from ecidic.validation import EntryValidationError, ValidationCode
 
 
 def test_missing_overlay_directory_is_empty(tmp_path: Path) -> None:
@@ -152,3 +152,34 @@ def test_save_personal_overlay_rejects_unencodable_entry(tmp_path: Path) -> None
 
 	with pytest.raises(DictionaryEncodingError):
 		save_personal_overlay(overlay, tmp_path)
+
+
+def test_an_entry_saved_before_a_rule_tightened_still_loads_and_save_refuses_without_deleting(
+	tmp_path: Path,
+) -> None:
+	# The old validator accepted any annotation in an Exact word value.
+	legacy_path = tmp_path / "ENUmain.dic"
+	legacy_bytes = b"loud\t`vv0 word\r\nquiet\t`00 word\r\n"
+	_ = legacy_path.write_bytes(legacy_bytes)
+	deu_path = tmp_path / "deumain.dic"
+	_ = deu_path.write_bytes(b"Haus\thaus\r\n")
+
+	overlay, diagnostics = load_personal_overlay(tmp_path)
+
+	assert diagnostics == ()
+	assert overlay.get_entry("enu", Slot.MAIN, "loud") == Entry("loud", "`vv0 word")
+	overlay.set_entry("deu", Slot.MAIN, Entry("Haus", "hause"))
+	with pytest.raises(EntryValidationError) as error:
+		save_personal_overlay(overlay, tmp_path)
+	assert error.value.issue.code is ValidationCode.ANNOTATION_INVALID
+	assert legacy_path.read_bytes() == legacy_bytes
+	assert deu_path.read_bytes() == b"Haus\thaus\r\n"
+
+	overlay.remove_entry("enu", Slot.MAIN, "loud")
+	save_personal_overlay(overlay, tmp_path)
+
+	assert [path.name for path in tmp_path.iterdir() if path.name.casefold() == "enumain.dic"] == [
+		"enumain.dic",
+	]
+	assert (tmp_path / "enumain.dic").read_bytes() == b"quiet\t`00 word\r\n"
+	assert deu_path.read_bytes() == b"Haus\thause\r\n"

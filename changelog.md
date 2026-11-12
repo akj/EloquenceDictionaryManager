@@ -10,8 +10,10 @@ First release.
   remove your own entries, and customize any entry in the bundled set without
   changing the set itself.
 - Plays the current and the new pronunciation of an entry when Eloquence or
-  OpenEVV is your synthesizer. A phonetic pronunciation plays correctly only
-  when the synthesizer's backquote voice tags setting is on.
+  OpenEVV is your synthesizer. A phonetic pronunciation plays only when the
+  synthesizer's backquote voice tags setting is on; otherwise Play new tells you
+  to turn it on. A future synthesizer version can let Play new preview these
+  without the setting.
 - Checks each entry against the rules Eloquence follows before saving it:
   - Word roots can contain an apostrophe inside the word, as in "j'accuse".
   - German abbreviations such as "Dipl.-Ing." are accepted.
@@ -19,6 +21,9 @@ First release.
     refused, because Eloquence never uses them. Use an Exact word entry instead.
   - Entries longer than Eloquence accepts are refused, because Eloquence would
     reject the whole dictionary file.
+  - A pronunciation can use phonetic strings, emphasis codes, and spelling
+    codes. Other backquote codes, such as pause, voice, or volume codes, are
+    refused, because they can silence or change speech after the word.
 - A personal Word root entry overrides the set's Exact word entries for the same
   word, whatever their capitalization. The editor hides the overridden entries.
   A synthesizer applies this only if it supports the rule.
