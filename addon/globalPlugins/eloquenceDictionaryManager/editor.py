@@ -99,7 +99,7 @@ def _entry_rules() -> dict[Slot, str]:
 	return {
 		Slot.MAIN: _(
 			# Translators: Rules shown for an exact-word dictionary entry.
-			'Matches the word exactly as written — capitalization counts, so "NASA" and "nasa" are separate entries. The word cannot contain spaces or end with punctuation. The pronunciation may be words, phonetic strings like `[.1kwi.0nwa], emphasis codes `0 (flat) through `4 (strongest) followed by a space, or spelling codes `ts1 through `ts3 turned off again with `ts0. Other backquote codes are not allowed.',
+			'Matches the word exactly as written — capitalization counts, so "NASA" and "nasa" are separate entries. The word cannot contain spaces or end with punctuation. The pronunciation may be words, phonetic strings like `[.1kwi.0nwa], emphasis codes `0 (flat) through `4 (strongest) followed by a space, or spelling codes `ts1 through `ts3 turned off again with `ts0 after a space. Other backquote codes are not allowed.',
 		),
 		Slot.ROOT: _(
 			# Translators: Rules shown for a word-root dictionary entry.

@@ -102,9 +102,9 @@ Entries are checked before they are accepted:
   phonetic strings such as `` `[.1Ar.0min] ``, emphasis codes `` `0 `` to
   `` `4 `` and `` `00 `` after a space, and spelling codes `` `ts0 `` to
   `` `ts3 ``. A spelling code that turns spelling on must be turned off with
-  `` `ts0 `` before the end. Other backquote codes, such as pause, voice, or
-  volume codes, are not accepted in any entry, because they can silence or
-  change speech after the word.
+  `` `ts0 `` before the end, and `` `ts0 `` must follow a space. Other
+  backquote codes, such as pause, voice, or volume codes, are not accepted in
+  any entry, because they can silence or change speech after the word.
 - **Word root** entries contain letters, with apostrophes allowed inside the
   word, such as "j'accuse". They are stored in lowercase and ignore
   capitalization when matching. A pronunciation must be one bare word or one

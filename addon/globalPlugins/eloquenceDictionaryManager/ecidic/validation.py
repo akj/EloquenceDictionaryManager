@@ -358,10 +358,11 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 def _annotation_issues(value: str) -> list[ValidationIssue]:
 	"""Check that every backquote in *value* begins a permitted annotation.
 
-	A phonetic string or an emphasis code must start the value or follow whitespace,
-	and an emphasis code must be followed by whitespace. A spelling-mode code may sit
-	anywhere, and one that turns spelling on must be turned off with ``ts0`` before
-	the value ends. SPR structure is checked separately.
+	A phonetic string, an emphasis code or ``ts0`` must start the value or follow
+	whitespace, and an emphasis code must be followed by whitespace. A code that turns
+	spelling on may sit anywhere, and must be turned off with ``ts0`` before the value
+	ends: the engines ignore a ``ts0`` glued to the text before it. SPR structure is
+	checked separately.
 	"""
 
 	spelling_on = False
@@ -369,10 +370,10 @@ def _annotation_issues(value: str) -> list[ValidationIssue]:
 	while position >= 0:
 		match = _ANNOTATION.match(value, position)
 		after_space = position == 0 or value[position - 1].isspace()
-		if match is None or (match["spelling"] is None and not after_space):
+		if match is None or (match["spelling"] in (None, "0") and not after_space):
 			message = _(
-				# Translators: Validation error when the pronunciation contains a backquote code that is not allowed. `[...], `0, `4, `00, `ts0 and `ts3 are literal codes and must not be translated.
-				"A backquote can only start a phonetic string (`[...]), an emphasis code after a space (`0 to `4, or `00), or a spelling code (`ts0 to `ts3). Other backquote codes are not allowed.",
+				# Translators: Validation error when the pronunciation contains a backquote code that is not allowed. It names the codes without their symbols so that speech reads it in full. 0, 4, 00, ts0 and ts3 are literal codes and must not be translated.
+				"A backquote can only start a phonetic string in square brackets, an emphasis code from 0 to 4 or 00 after a space, or a spelling code from ts0 to ts3, with ts0 after a space. Other backquote codes are not allowed.",
 			)
 			return [_issue(ValidationCode.ANNOTATION_INVALID, Field.VALUE, message)]
 		if match["spelling"] is not None:

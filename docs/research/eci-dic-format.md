@@ -490,6 +490,8 @@ and `` `ts3 `` letters in the radio alphabet (US English only); `` `ts0 `` turns
 off (tts.txt:3500–3510). The bundled `deumain.dic` spells six abbreviations this way,
 for example `AOK<TAB>`ts1AOK `ts0`. Text follows the code directly there, and the code
 starts the value, so the manual's "preceded by white space" rule says nothing about it.
+The closing `` `ts0 `` does need whitespace before it: the engines ignore a `` `ts0 ``
+glued to the text before it (§9d).
 
 ### 9d. Which annotations a valid entry may carry **[convention]**
 
@@ -503,8 +505,29 @@ voice tags" setting says: Eloquence always sets `ECI_INPUT_TYPE` to 1
 setting only turns backquotes in spoken text into spaces (`_eloquence_text.py`). ReLoq
 C's user guide says dictionaries carry annotations "independently of this setting", and
 the IBMTTS driver's readme says to disable the setting "to protect yourself from
-malicious codes from jokers". **None of this has been tested on an engine:** whether such a code
-in a dictionary value takes effect, and whether it outlasts the utterance, is open.
+malicious codes from jokers".
+
+**Engine tests [engine].** On 2026-11-12, Exact word values were loaded from `enumain.dic`
+files written by EDM's serializer and synthesized through fastfinge/eloquence_64's
+`EciEngine`, on the proprietary `ECI.DLL`, OpenEVV main@7ffd7549 and ReLoq C
+codex/release140@29efceb3, one child process per case. The key word sat mid-sentence,
+followed by a separate second utterance. The PCM was measured, not listened to.
+
+| Value | Proprietary | OpenEVV | ReLoq C |
+|---|---|---|---|
+| `` `vv10 marker `` | rest of sentence RMS ×0.04; next utterance ×0.04 unless the synth resets volume | the same; `` `vv0 `` silences the rest | ignored |
+| `` `p3000 marker `` | 3 s pause; next utterance unchanged | the same | the same |
+| `` `l4.0 marker `` | spelled out, language unchanged | the same | the same |
+| `` `ts1 abc `` (unclosed) | rest of sentence and next utterance spelled | the same | rest of sentence spelled |
+| `` `ts1 abc`ts0 `` (glued close) | as unclosed | as unclosed | as unclosed |
+| `` `ts1 abc `ts0 ``, `` `ts1 abc `ts0def `` | spelling ends; nothing carries over | the same | the same |
+| unclosed, empty, nonsense or 307-byte SPR | spelled out; no hang or crash; nothing carries over | the same | the same |
+| `` re`[.1Ar.0min] `` | identical to `` re `[.1Ar.0min] `` | the same | the same |
+| value over 512 bytes | cut to 512; 528 bytes fails the file; 529+ crashes `eciLoadDict` | cut to 512 | values of 511+ bytes dropped |
+
+`` `[.1Ar.0min] ``, `` `1 can `` and `` `00 marker `` each change the audio the way their
+form promises. An emphasis code not followed by whitespace (`` `1can ``) and `` `ts10 ``
+are read as garbage, not as the code.
 
 So EDM's validator allows only the three forms curators use, and every other backquote
 makes the entry invalid (`annotationInvalid`) in every slot:
@@ -512,9 +535,13 @@ makes the entry invalid (`annotationInvalid`) in every slot:
 - an SPR, `` `[ ``, at the start of the value or after whitespace;
 - an emphasis code, `` `00 `` or one digit `` `0 `` to `` `4 `` not followed by another
   digit, at the start of the value or after whitespace, and followed by whitespace; and
-- a spelling-mode code, `` `ts0 `` to `` `ts3 `` not followed by another digit, anywhere.
-  A value that turns spelling on must turn it off with `` `ts0 `` before it ends
-  (`spellingModeUnclosed`).
+- a spelling-mode code, `` `ts0 `` to `` `ts3 `` not followed by another digit. `` `ts1 ``
+  to `` `ts3 `` may sit anywhere, but `` `ts0 `` must start the value or follow
+  whitespace. A value that turns spelling on must turn it off with `` `ts0 `` before it
+  ends (`spellingModeUnclosed`).
+
+The rule is stricter than the engines in one place: a phonetic string glued to a word
+works, but stays invalid, because no curated value needs it.
 
 Every Exact word value with a backquote in the Community repository (a7bf35a, 374
 values), the Alt repository (96bcd00, 79 values), EDM's bundle (371 values) and

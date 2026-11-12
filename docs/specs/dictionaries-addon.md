@@ -565,9 +565,11 @@ The minimum validation contract is:
     by another digit, at the start of the value or after whitespace, and
     followed by whitespace; and
   - a spelling-mode code, `` `ts0 `` to `` `ts3 ``, not followed by another
-    digit. Text may follow it directly, as in `` `ts1AOK `ts0 ``. A value that
-    turns spelling on with `` `ts1 `` to `` `ts3 `` must turn it off with
-    `` `ts0 `` before it ends (`spellingModeUnclosed`).
+    digit. Text may follow it directly, as in `` `ts1AOK `ts0 ``. A `` `ts0 ``
+    must start the value or follow whitespace, because the engines ignore one
+    glued to the text before it. A value that turns spelling on with
+    `` `ts1 `` to `` `ts3 `` must turn it off with `` `ts0 `` before it ends
+    (`spellingModeUnclosed`).
 
   The engine accepts any annotation in an Exact word value, and it reads a
   dictionary value's codes whatever a synth's backquote voice tags setting
@@ -575,7 +577,10 @@ The minimum validation contract is:
   code that can last about 330 seconds, voice, volume and speed codes that stay
   in effect until changed or the program restarts, and spelling modes that stay
   on until `` `ts0 `` (`tts.txt` in fastfinge/eloquence_64, lines 376, 3336–3338,
-  3446–3447 and 3500–3510). None of this has been tested on an engine. A shared
+  3446–3447 and 3500–3510). Engine tests confirm it for dictionary values: a
+  volume code turns the rest of the sentence down and can carry into the next
+  utterance, a pause code pauses, and a spelling mode left on spells what
+  follows (see `docs/research/eci-dic-format.md` §9d). A shared
   `.edm-dict` file, a downloaded set, or a bad upstream commit could carry such a
   code, so the definition of a valid entry allows only the three forms. Every
   Exact word value in the bundled set, in the Community and Alt repositories,
