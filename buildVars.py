@@ -28,7 +28,7 @@ addon_info = AddonInfo(
 	# Brief changelog for this version
 	addon_changelog=_(
 		# Translators: what's new content for the add-on version to be shown in the add-on store
-		"Adds the bundled IBMTTSDictionaries set, personal-entry editing and sharing, and migration of hand edits from old Eloquence dictionary files.",
+		"First release. Bundles the v26.11 release of the IBMTTSDictionaries pronunciation set curated by eigencrow. Lets you add and customize your own pronunciations, with spoken previews when Eloquence or OpenEVV is your synthesizer. Checks each entry against the rules Eloquence follows, so an entry it would never use or would reject is refused. A personal word root entry overrides the set's exact-word entries for the same word. Exports and imports personal entries as .edm-dict files, and recovers your hand edits from old Eloquence dictionary files, including the backup the Eloquence add-on keeps in your NVDA configuration.",
 	),
 	# Author(s)
 	addon_author="Andrew <andrew@johnson5.net>",
@@ -45,7 +45,7 @@ addon_info = AddonInfo(
 	# Add-on update channel (default is None, denoting stable releases,
 	# and for development releases, use "dev".)
 	# Do not change unless you know what you are doing!
-	addon_updateChannel="dev",
+	addon_updateChannel=None,
 	# Add-on license such as GPL 2
 	addon_license="GPL v2 or later",
 	# URL for the license document the ad-on is licensed under
