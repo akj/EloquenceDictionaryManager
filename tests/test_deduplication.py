@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ecidic import Entry, Slot, deduplicate_entries, key_identity, merge_entries
+from ecidic import Entry, Slot, deduplicate_entries, key_identity
 
 
 def test_root_key_identity_and_deduplication_are_case_insensitive() -> None:
@@ -32,14 +32,4 @@ def test_abbreviation_keys_compare_exactly() -> None:
 	assert deduplicate_entries(entries, Slot.ABBREVIATION) == (
 		Entry("dr", "drive"),
 		Entry("Dr", "latest"),
-	)
-
-
-def test_personal_overlay_wins_when_entries_are_merged() -> None:
-	managed = [Entry("FIGURE", "managed"), Entry("other", "managed other")]
-	personal = [Entry("figure", "personal")]
-
-	assert merge_entries(managed, personal, Slot.ROOT) == (
-		Entry("other", "managed other"),
-		Entry("figure", "personal"),
 	)

@@ -178,16 +178,6 @@ def deduplicate_entries(entries: Iterable[Entry], slot: Slot | str) -> tuple[Ent
 	return tuple(result)
 
 
-def merge_entries(
-	managed: Iterable[Entry],
-	personal: Iterable[Entry],
-	slot: Slot | str,
-) -> tuple[Entry, ...]:
-	"""Merge managed and Personal Dictionary Overlay entries, personal last-wins."""
-
-	return deduplicate_entries((*managed, *personal), slot)
-
-
 def serialize_dictionary_bytes(
 	entries: Iterable[Entry],
 	language: Language | str,
