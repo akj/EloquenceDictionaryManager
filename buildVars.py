@@ -21,14 +21,14 @@ addon_info = AddonInfo(
 	# Add-on description
 	addon_description=_(
 		# Translators: Long description shown for this add-on in the add-on store.
-		"Eloquence Dictionary Manager bundles the community IBMTTSDictionaries Eloquence pronunciation dictionary set curated by eigencrow, ready to use as soon as the add-on is installed. Its editor lets you add and customize your own pronunciations with spoken previews, export and import .edm-dict files to share or back up personal entries, and recover your hand edits from Eloquence dictionary files used before this add-on. The add-on software is licensed under the GNU General Public License, version 2 or later. The bundled dictionary data is licensed separately under CC0-1.0, a public domain dedication. The migration feature uses only content hashes derived from the history of mohamed00's AltIBMTTSDictionaries; that set's dictionary content is not bundled.",
+		"Eloquence Dictionary Manager bundles the community IBMTTSDictionaries Eloquence pronunciation dictionary set curated by eigencrow, so you don't need to download it separately. Its editor lets you add and customize your own pronunciations with spoken previews, export and import .edm-dict files to share or back up personal entries, and recover your hand edits from Eloquence dictionary files used before this add-on. The add-on software is licensed under the GNU General Public License, version 2 or later. The bundled dictionary data is licensed separately under CC0-1.0, a public domain dedication. The migration feature uses only content hashes derived from the history of mohamed00's AltIBMTTSDictionaries; that set's dictionary content is not bundled.",
 	),
 	# version
 	addon_version="0.1.0",
 	# Brief changelog for this version
 	addon_changelog=_(
 		# Translators: what's new content for the add-on version to be shown in the add-on store
-		"First release. Bundles the v26.11 release of the IBMTTSDictionaries pronunciation set curated by eigencrow. Lets you add and customize your own pronunciations, with spoken previews when Eloquence or OpenEVV is your synthesizer. Checks each entry against the rules Eloquence follows, so an entry it would never use or would reject is refused. A personal word root entry overrides the set's exact-word entries for the same word. Exports and imports personal entries as .edm-dict files, and recovers your hand edits from old Eloquence dictionary files, including the backup the Eloquence add-on keeps in your NVDA configuration.",
+		"First release. Includes the v26.11 release of the IBMTTSDictionaries pronunciation set curated by eigencrow, so you don't need to download it separately. Lets you add and customize your own pronunciations, with spoken previews when Eloquence or OpenEVV is your synthesizer. Checks each entry against the rules Eloquence follows, so an entry it would never use or would reject is refused. A personal word root entry overrides the set's exact-word entries for the same word, in synthesizers that support this. Exports and imports personal entries as .edm-dict files, and recovers your hand edits from old Eloquence dictionary files, including the backup the Eloquence add-on keeps in your NVDA configuration.",
 	),
 	# Author(s)
 	addon_author="Andrew <andrew@johnson5.net>",
