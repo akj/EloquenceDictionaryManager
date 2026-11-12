@@ -21,7 +21,9 @@
 		"sprUnclosed": "An SPR opened with `[ has no closing ] before the next `[ or the end of the value.",
 		"sprEmpty": "An SPR has nothing between `[ and ].",
 		"sprQuoteInvalid": "An SPR has an unmatched apostrophe, or a quoted symbol that is not exactly two characters.",
-		"sprPrimaryStressRequired": "An SPR with more than one syllable has no primary stress marker 1."
+		"sprPrimaryStressRequired": "An SPR with more than one syllable has no primary stress marker 1.",
+		"annotationInvalid": "The value has a backquote that does not begin one of three permitted forms. An SPR (`[) must start the value or follow whitespace. An emphasis code (`00, or one digit `0 to `4 not followed by another digit) must start the value or follow whitespace, and must be followed by whitespace. A spelling-mode code (`ts0 to `ts3, not followed by another digit) may be followed directly by text. `ts1 to `ts3 may appear anywhere, but `ts0 must start the value or follow whitespace, because the engines ignore a `ts0 glued to the text before it and spelling then carries on into the next utterance. Every other backquote, such as a pause, voice, volume or language code, is invalid in every slot, because it can silence or change speech after the word.",
+		"spellingModeUnclosed": "The value turns on a spelling mode with `ts1, `ts2 or `ts3 and does not turn it off with `ts0 before it ends."
 	},
 	"warnings": {
 		"abbreviationKeyNeverMatches": "An English (enu or eng) abbreviation key contains a hyphen, slash or ampersand. The engine loads the entry but never matches it, so the entry is never used."
@@ -117,6 +119,23 @@
 		{"voice": "deu", "slot": "main", "key": "heim", "value": "`[h'aj'm]", "expected": "valid", "note": "Two-character symbols are quoted with apostrophes. One syllable needs no stress marker."},
 		{"voice": "enu", "slot": "main", "key": "word", "value": "`[.abc.def]", "expected": "sprPrimaryStressRequired"},
 		{"voice": "enu", "slot": "root", "key": "word", "value": "`[.ab.cd]", "expected": "sprPrimaryStressRequired", "note": "SPR structure is checked in root values too."},
-		{"voice": "enu", "slot": "main", "key": "word", "value": "`[.1ZZZ]", "expected": "valid", "note": "Phoneme symbols are not checked against the voice's symbol table."}
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`[.1ZZZ]", "expected": "valid", "note": "Phoneme symbols are not checked against the voice's symbol table."},
+
+		{"voice": "deu", "slot": "main", "key": "Armin", "value": "say `[.1Ar.0min] twice", "expected": "valid", "note": "A phonetic string can follow whitespace anywhere in a main value."},
+		{"voice": "esp", "slot": "main", "key": "ni", "value": "`00 ni", "expected": "valid"},
+		{"voice": "deu", "slot": "main", "key": "AOK", "value": "`ts1AOK `ts0", "expected": "valid", "note": "Text may follow a spelling code directly. As in the bundled deumain.dic."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`p20000 word", "expected": "annotationInvalid", "note": "A pause code. One pause can last about 330 seconds."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`vv0 word", "expected": "annotationInvalid", "note": "A volume code, which stays in effect after the word."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`l2 word", "expected": "annotationInvalid", "note": "A language code."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`5 word", "expected": "annotationInvalid", "note": "Emphasis levels stop at 4."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`01 word", "expected": "annotationInvalid", "note": "An emphasis code is one digit, or 00."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`0word", "expected": "annotationInvalid", "note": "An emphasis code must be followed by whitespace."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "word`0 box", "expected": "annotationInvalid", "note": "An emphasis code must start the value or follow whitespace."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "word`[.1a]", "expected": "annotationInvalid", "note": "A phonetic string must start the value or follow whitespace."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`ts4 word `ts0", "expected": "annotationInvalid", "note": "Spelling modes stop at 3."},
+		{"voice": "enu", "slot": "main", "key": "abc", "value": "`ts1 abc`ts0", "expected": "annotationInvalid", "note": "A `ts0 glued to the text before it does not turn spelling off on any engine tested, so the rest of the sentence is spelled too, and on Eloquence and OpenEVV the next utterance as well."},
+		{"voice": "enu", "slot": "main", "key": "abc", "value": "`ts1 abc `ts0def", "expected": "valid", "note": "Text may follow `ts0 directly: the audio is identical to `ts0 def."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "word `", "expected": "annotationInvalid", "note": "A backquote that starts nothing."},
+		{"voice": "enu", "slot": "main", "key": "word", "value": "`ts1AOK", "expected": "spellingModeUnclosed", "note": "Spelling mode stays on until `ts0, so it would spell the text that follows."}
 	]
 }

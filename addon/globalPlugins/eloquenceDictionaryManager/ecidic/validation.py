@@ -52,6 +52,8 @@ class ValidationCode(str, Enum):
 	SPR_EMPTY = "sprEmpty"
 	SPR_QUOTE_INVALID = "sprQuoteInvalid"
 	SPR_PRIMARY_STRESS_REQUIRED = "sprPrimaryStressRequired"
+	ANNOTATION_INVALID = "annotationInvalid"
+	SPELLING_MODE_UNCLOSED = "spellingModeUnclosed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +95,12 @@ _NEVER_MATCHING_ABBREVIATION_CHARACTERS = frozenset("-/&")
 _ABBREVIATION_SEPARATOR = re.compile(r"\.-?")
 # English voices also load a hyphen, slash or ampersand on its own between two words.
 _ENGLISH_ABBREVIATION_SEPARATOR = re.compile(r"\.-?|[-/&]")
+
+
+# The backquote codes a value may carry: a phonetic string, an emphasis code, or a spelling-mode
+# code. Any other annotation, such as a pause, voice, volume or language code, can silence or
+# derail speech well past the word, so it makes the entry invalid.
+_ANNOTATION = re.compile(r"`(?:(?P<spr>\[)|(?P<emphasis>00|[0-4])(?=\s)|ts(?P<spelling>[0-3])(?!\d))")
 
 
 class EntryValidationError(ValueError):
@@ -347,6 +355,39 @@ def _spr_issues(value: str) -> list[ValidationIssue]:
 	return issues
 
 
+def _annotation_issues(value: str) -> list[ValidationIssue]:
+	"""Check that every backquote in *value* begins a permitted annotation.
+
+	A phonetic string, an emphasis code or ``ts0`` must start the value or follow
+	whitespace, and an emphasis code must be followed by whitespace. A code that turns
+	spelling on may sit anywhere, and must be turned off with ``ts0`` before the value
+	ends: the engines ignore a ``ts0`` glued to the text before it. SPR structure is
+	checked separately.
+	"""
+
+	spelling_on = False
+	position = value.find("`")
+	while position >= 0:
+		match = _ANNOTATION.match(value, position)
+		after_space = position == 0 or value[position - 1].isspace()
+		if match is None or (match["spelling"] in (None, "0") and not after_space):
+			message = _(
+				# Translators: Validation error when the pronunciation contains a backquote code that is not allowed. It names the codes without their symbols so that speech reads it in full. 0, 4, 00, ts0 and ts3 are literal codes and must not be translated.
+				"A backquote can only start a phonetic string in square brackets, an emphasis code from 0 to 4 or 00 after a space, or a spelling code from ts0 to ts3, with ts0 after a space. Other backquote codes are not allowed.",
+			)
+			return [_issue(ValidationCode.ANNOTATION_INVALID, Field.VALUE, message)]
+		if match["spelling"] is not None:
+			spelling_on = match["spelling"] != "0"
+		position = value.find("`", position + 1)
+	if spelling_on:
+		message = _(
+			# Translators: Validation error when the pronunciation turns on a spelling mode and does not turn it off. `ts0, `ts1, `ts2 and `ts3 are literal codes and must not be translated.
+			"The pronunciation turns on spelling with `ts1, `ts2 or `ts3, but does not turn it off with `ts0 before it ends.",
+		)
+		return [_issue(ValidationCode.SPELLING_MODE_UNCLOSED, Field.VALUE, message)]
+	return []
+
+
 def validate_entry(
 	entry: Entry,
 	slot: Slot | str,
@@ -363,8 +404,10 @@ def validate_entry(
 		issues.extend(_slot_issues(entry, slot_value, language_record))
 	issues.extend(_encoding_issues(entry, language_record))
 	issues.extend(_length_issues(entry, language_record))
-	if slot_value is not Slot.ABBREVIATION and Field.VALUE not in mechanically_invalid_fields:
-		issues.extend(_spr_issues(entry.value))
+	if Field.VALUE not in mechanically_invalid_fields:
+		if slot_value is not Slot.ABBREVIATION:
+			issues.extend(_spr_issues(entry.value))
+		issues.extend(_annotation_issues(entry.value))
 	return tuple(issues)
 
 

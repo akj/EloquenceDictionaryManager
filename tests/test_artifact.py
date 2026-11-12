@@ -408,3 +408,20 @@ def test_entries_eloquence_would_never_use_are_skipped_like_invalid_entries() ->
 	assert (result.imported, result.skipped_invalid) == (1, 1)
 	assert target.get_entry("enu", Slot.ABBREVIATION, "Lt.-Col.") is None
 	assert target.get_entry("enu", Slot.ABBREVIATION, "Dr.") == Entry("Dr.", "doctor")
+
+
+def test_entries_with_a_disallowed_backquote_code_are_skipped_like_invalid_entries() -> None:
+	data = _build_artifact(
+		{
+			MANIFEST_FILENAME: _manifest_bytes(),
+			"enumain.dic": b"silence\t`p300000 word\r\nmbox\tem `0 box\r\n",
+		},
+	)
+	artifact = read_edm_dict_artifact(data)
+	target = PersonalOverlay()
+
+	result = apply_import_plan(target, build_import_plan(artifact, target))
+
+	assert (result.imported, result.skipped_invalid) == (1, 1)
+	assert target.get_entry("enu", Slot.MAIN, "silence") is None
+	assert target.get_entry("enu", Slot.MAIN, "mbox") == Entry("mbox", "em `0 box")

@@ -229,7 +229,9 @@ def _validate_dictionary_bytes(name: str, data: bytes) -> list[str]:
 	lookup time, and upstream sets knowingly ship a few, so line structure and
 	editor-grade entry rules must not block vendoring content verbatim — they
 	are surfaced to the maintainer as warnings instead. Undecodable bytes and
-	unsupported filenames still abort the refresh.
+	unsupported filenames still abort the refresh. An entry with a disallowed
+	backquote code may take effect rather than be ignored, so the test suite
+	fails if one reaches the bundled set.
 	"""
 
 	filename, text = _decode_dictionary_bytes(name, data)
@@ -264,7 +266,7 @@ def _validate_dictionary_bytes(name: str, data: bytes) -> list[str]:
 	if invalid_count:
 		messages.append(
 			f"{name}: {invalid_count} line(s) violate the dictionary format or editor validation "
-			+ f"rules and will be ignored by the engine at lookup time ({'; '.join(examples)})",
+			+ f"rules ({'; '.join(examples)})",
 		)
 	if never_used:
 		messages.append(

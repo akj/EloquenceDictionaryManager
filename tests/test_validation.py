@@ -245,6 +245,75 @@ def test_spr_validation_does_not_check_language_specific_phoneme_legality() -> N
 
 
 @pytest.mark.parametrize(
+	"value",
+	[
+		"`[.1Ar.0min]",
+		"say `[.1Ar.0min] twice",
+		"em `0 box",
+		"`00 ni",
+		"`1 no",
+		"`4 loud and `2 clear",
+		"`ts1AOK `ts0",
+		"`ts2ABC `ts0 text",
+		"`ts1 abc `ts0def",
+		"x`ts1 abc `ts0",
+		"`ts3 Q `ts1 R `ts0",
+		"plain `ts0",
+	],
+)
+def test_exact_word_values_allow_phonetic_emphasis_and_spelling_codes(value: str) -> None:
+	assert codes(Entry("word", value)) == []
+
+
+@pytest.mark.parametrize(
+	"value",
+	[
+		"`p20000 word",
+		"`v1 word",
+		"`vv0 word",
+		"`l2 word",
+		"`5 word",
+		"`01 word",
+		"`000 word",
+		"`0word",
+		"word `0",
+		"word`0 box",
+		"word`[.1a]",
+		"`ts4 word `ts0",
+		"`ts10 word `ts0",
+		"`ts2ABC`ts0 text",
+		"`ts1 abc`ts0",
+		"word`ts0",
+		"word `",
+		"`",
+		"``0 word",
+		"`[.1a`v1]",
+	],
+)
+def test_other_backquote_codes_are_invalid(value: str) -> None:
+	issues = validate_entry(Entry("word", value), Slot.MAIN, "enu")
+
+	assert [(issue.code, issue.field) for issue in issues] == [
+		(ValidationCode.ANNOTATION_INVALID, Field.VALUE),
+	]
+
+
+@pytest.mark.parametrize("value", ["`ts1AOK", "`ts1 A `ts0 B `ts2 C", "`ts0 A `ts3 B"])
+def test_spelling_mode_must_be_turned_off_before_the_value_ends(value: str) -> None:
+	assert codes(Entry("word", value)) == [ValidationCode.SPELLING_MODE_UNCLOSED]
+
+
+@pytest.mark.parametrize(
+	("slot", "value"),
+	[(Slot.ROOT, "`v1"), (Slot.ABBREVIATION, "`p100")],
+)
+def test_backquote_codes_are_checked_in_every_slot_even_without_a_word(slot: Slot, value: str) -> None:
+	# Play new validates the pronunciation before the Word field is filled in, when the
+	# slot's own value rule is skipped, so the annotation rule must still catch the code.
+	assert codes(Entry("", value), slot) == [ValidationCode.EMPTY_KEY, ValidationCode.ANNOTATION_INVALID]
+
+
+@pytest.mark.parametrize(
 	("entry", "field"),
 	[
 		(Entry("漢", "word"), Field.KEY),

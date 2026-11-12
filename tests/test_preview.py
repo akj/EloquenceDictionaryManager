@@ -4,13 +4,13 @@ import builtins
 import importlib.util
 from pathlib import Path
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 from unittest.mock import call, Mock
 
 import pytest
 
-from ecidic.preview import can_preview
+from ecidic.preview import can_preview, play_new, PlayNew
 
 
 EDITOR_PATH = (
@@ -95,6 +95,173 @@ def editor_module(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 )
 def test_can_preview(synth_name: str | None, expected: bool) -> None:
 	assert can_preview(synth_name) is expected
+
+
+def _synth(name: str, **attributes: object) -> SimpleNamespace:
+	return SimpleNamespace(name=name, **attributes)
+
+
+def _say_nothing(_pronunciation: str) -> None:
+	pass
+
+
+@pytest.mark.parametrize(
+	("synth", "pronunciation", "expected"),
+	[
+		(None, "`[.1Ar.0min]", PlayNew.UNAVAILABLE),
+		(_synth("espeak"), "plain", PlayNew.UNAVAILABLE),
+		(
+			_synth("espeak", previewEciPronunciation=_say_nothing),
+			"`[.1Ar.0min]",
+			PlayNew.PREVIEW_METHOD,
+		),
+		(
+			_synth("eloquence", backquoteVoiceTags=False, previewEciPronunciation=_say_nothing),
+			"`[.1Ar.0min]",
+			PlayNew.PREVIEW_METHOD,
+		),
+		(_synth("eloquence", previewEciPronunciation="not callable"), "plain", PlayNew.SPEAK),
+		(_synth("eloquence", backquoteVoiceTags=False), "`[.1Ar.0min]", PlayNew.NEEDS_VOICE_TAGS),
+		(_synth("eloquence", backquoteVoiceTags=False), "em `0 box", PlayNew.NEEDS_VOICE_TAGS),
+		(_synth("eloquence", backquoteVoiceTags=True), "`[.1Ar.0min]", PlayNew.SPEAK),
+		(_synth("eloquence", backquoteVoiceTags=False), "junior grade", PlayNew.SPEAK),
+		(_synth("eloquence", voiceTags=True), "`[.1Ar.0min]", PlayNew.NEEDS_VOICE_TAGS),
+		(_synth("openevv", voiceTags=False), "`[.1Ar.0min]", PlayNew.NEEDS_VOICE_TAGS),
+		(_synth("openevv", voiceTags=True), "`[.1Ar.0min]", PlayNew.SPEAK),
+		(_synth("openevv", backquoteVoiceTags=True), "`[.1Ar.0min]", PlayNew.NEEDS_VOICE_TAGS),
+		(_synth("openevv"), "`[.1Ar.0min]", PlayNew.NEEDS_VOICE_TAGS),
+	],
+)
+def test_play_new_reads_the_synths_own_voice_tag_setting(
+	synth: object,
+	pronunciation: str,
+	expected: PlayNew,
+) -> None:
+	assert play_new(synth, pronunciation) is expected
+
+
+def _play_new_dialog(editor_module: ModuleType, pronunciation: str, *, slot: str = "MAIN") -> Mock:
+	dialog = Mock()
+	dialog._language = "enu"
+	dialog._word_control.GetValue.return_value = "Armin"
+	dialog._pronunciation_control.GetValue.return_value = pronunciation
+	dialog._selectedSlot.return_value = getattr(editor_module.Slot, slot)
+	return dialog
+
+
+@pytest.mark.parametrize(
+	("pronunciation", "message"),
+	[
+		("`p20000 Armin", "A backquote can only start a phonetic string"),
+		("`[.1Ar.0min", "The phonetic string is not closed"),
+		("   ", "A pronunciation is required."),
+	],
+)
+def test_play_new_announces_an_invalid_pronunciation_and_speaks_nothing(
+	editor_module: ModuleType,
+	pronunciation: str,
+	message: str,
+) -> None:
+	synth = Mock(name="synth", spec=["name", "speak", "backquoteVoiceTags", "previewEciPronunciation"])
+	synth.name = "eloquence"
+	synth.backquoteVoiceTags = True
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+
+	editor_module.EntryDialog._onPlayNew(_play_new_dialog(editor_module, pronunciation), Mock())
+
+	synth.speak.assert_not_called()
+	synth.previewEciPronunciation.assert_not_called()
+	editor_module.speech.cancelSpeech.assert_not_called()
+	editor_module.ui.message.assert_called_once()
+	assert editor_module.ui.message.call_args.args[0].startswith(message)
+
+
+def test_play_new_ignores_word_problems_and_checks_the_pronunciation_without_a_word(
+	editor_module: ModuleType,
+) -> None:
+	synth = Mock(name="synth", spec=["name", "speak", "backquoteVoiceTags"])
+	synth.name = "eloquence"
+	synth.backquoteVoiceTags = True
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+	dialog = _play_new_dialog(editor_module, "`v1", slot="ROOT")
+	dialog._word_control.GetValue.return_value = ""
+
+	editor_module.EntryDialog._onPlayNew(dialog, Mock())
+
+	synth.speak.assert_not_called()
+	assert editor_module.ui.message.call_args.args[0].startswith("A backquote can only start")
+
+
+def test_play_new_calls_the_synths_preview_method_with_the_stripped_pronunciation(
+	editor_module: ModuleType,
+) -> None:
+	call_order = Mock()
+	synth = Mock(name="synth", spec=["name", "speak", "backquoteVoiceTags", "previewEciPronunciation"])
+	synth.name = "eloquence"
+	synth.backquoteVoiceTags = False
+	editor_module.speech.cancelSpeech.side_effect = call_order.cancelSpeech
+	synth.previewEciPronunciation.side_effect = call_order.previewEciPronunciation
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+
+	editor_module.EntryDialog._onPlayNew(_play_new_dialog(editor_module, " `[.1Ar.0min] "), Mock())
+
+	assert call_order.mock_calls == [
+		call.cancelSpeech(),
+		call.previewEciPronunciation("`[.1Ar.0min]"),
+	]
+	synth.speak.assert_not_called()
+	editor_module.ui.message.assert_not_called()
+
+
+def test_play_new_explains_why_a_phonetic_pronunciation_cannot_play_with_voice_tags_off(
+	editor_module: ModuleType,
+) -> None:
+	synth = Mock(name="synth", spec=["name", "speak", "voiceTags"])
+	synth.name = "openevv"
+	synth.voiceTags = False
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+
+	editor_module.EntryDialog._onPlayNew(_play_new_dialog(editor_module, "`[.1Ar.0min]"), Mock())
+
+	synth.speak.assert_not_called()
+	editor_module.speech.cancelSpeech.assert_not_called()
+	editor_module.ui.message.assert_called_once_with(
+		"To hear pronunciations with phonetic strings or other backquote codes, turn on backquote "
+		+ "voice tags in Voice settings.",
+	)
+
+
+@pytest.mark.parametrize(
+	("voice_tags", "pronunciation"),
+	[(True, "`[.1Ar.0min]"), (False, "are min")],
+)
+def test_play_new_speaks_when_the_synth_would_pass_the_pronunciation_through(
+	editor_module: ModuleType,
+	voice_tags: bool,
+	pronunciation: str,
+) -> None:
+	synth = Mock(name="synth", spec=["name", "speak", "backquoteVoiceTags"])
+	synth.name = "eloquence"
+	synth.backquoteVoiceTags = voice_tags
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+
+	editor_module.EntryDialog._onPlayNew(_play_new_dialog(editor_module, pronunciation), Mock())
+
+	synth.speak.assert_called_once_with([pronunciation])
+	editor_module.ui.message.assert_not_called()
+
+
+def test_play_new_is_unavailable_with_another_synth(editor_module: ModuleType) -> None:
+	synth = Mock(name="synth", spec=["name", "speak"])
+	synth.name = "espeak"
+	editor_module.synthDriverHandler.getSynth.return_value = synth
+
+	editor_module.EntryDialog._onPlayNew(_play_new_dialog(editor_module, "are min"), Mock())
+
+	synth.speak.assert_not_called()
+	editor_module.ui.message.assert_called_once_with(
+		"Preview unavailable: switch to Eloquence or OpenEVV to hear pronunciations.",
+	)
 
 
 def test_preview_does_not_cancel_speech_when_synth_cannot_preview(editor_module: ModuleType) -> None:
