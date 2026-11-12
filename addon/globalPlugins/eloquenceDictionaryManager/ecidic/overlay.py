@@ -137,7 +137,9 @@ def save_personal_overlay(overlay: PersonalOverlay, directory: str | Path) -> No
 		for slot in Slot:
 			try:
 				_checked = serialize_dictionary_bytes(
-					overlay.entries_for(language_code, slot), language_code, slot
+					overlay.entries_for(language_code, slot),
+					language_code,
+					slot,
 				)
 			except EntryValidationError as error:
 				if error.issue.code is ValidationCode.UNENCODABLE_CHARACTER:
