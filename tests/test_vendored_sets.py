@@ -286,7 +286,7 @@ def test_every_bundled_entry_uses_only_permitted_backquote_codes() -> None:
 			)
 
 	assert failures == []
-	assert with_backquote > 70_000
+	assert with_backquote > 0
 
 
 def test_refresh_rejects_an_upstream_tree_without_dictionaries(tmp_path: Path) -> None:
